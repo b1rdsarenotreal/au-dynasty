@@ -1,11 +1,11 @@
 // History (champions and realignment log) and Settings (sports, rules,
 // saving and loading).
 
-import { app, esc, L, $, $$, changed, toast, school, sportHref, openModal, options, ctx, flushSave } from './ui.js?v=20261030221621';
-import { yearLabel, addSport, addProgram, hasProgram, effectiveYear, newLeague, migrateLeague } from './league.js?v=20261030221621';
-import { MODELS, TERMS, GENDER } from './sports.js?v=20261030221621';
-import { exportLeague, saveLeague, clearLeague } from './store.js?v=20261030221621';
-import { FORM_LEVELS } from './season.js?v=20261030221621';
+import { app, esc, L, $, $$, changed, toast, school, sportHref, openModal, options, ctx, flushSave } from './ui.js?v=20261030222729';
+import { yearLabel, addSport, addProgram, hasProgram, effectiveYear, newLeague, migrateLeague, seedSport } from './league.js?v=20261030222729';
+import { MODELS, TERMS, GENDER } from './sports.js?v=20261030222729';
+import { exportLeague, saveLeague, clearLeague } from './store.js?v=20261030222729';
+import { FORM_LEVELS } from './season.js?v=20261030222729';
 
 export function renderHistory() {
   const lg = L();
@@ -34,7 +34,7 @@ export function renderSettings() {
         <label class="field">How much ratings move during a season<select id="form">${options(Object.keys(FORM_LEVELS).map(k => [k, k[0].toUpperCase() + k.slice(1)]), lg.settings.form)}</select></label>
       </div></div>
     <div class="card"><div class="section-head"><h2>Sports</h2><div class="spacer"></div><button class="btn" id="newsport">Add a sport</button></div>
-      <p class="note">A sport that's on is played from the next season that starts. Programs are per school; a sport with no programs needs schools to add it (on their pages, or all at once here).</p>
+      <p class="note">Turning a sport on gives a program to every school that has that sport in real life, and it's played from the next season that starts (this year if it's still the preseason). Turning it off keeps its programs. Ratings for sports other than football, women's basketball and softball are estimates for now.</p>
       <div class="table-wrap"><table><thead><tr><th>Sport</th><th>Season</th><th>Game model</th><th class="num">Programs ${yearLabel(eff)}</th><th>Played</th><th></th></tr></thead><tbody>
       ${Object.values(lg.sports).sort((a, b) => Object.keys(TERMS).indexOf(a.term) - Object.keys(TERMS).indexOf(b.term) || a.name.localeCompare(b.name)).map(s => `<tr>
         <td>${s.active ? `<a href="${sportHref(s.id)}">${esc(s.name)}</a>` : esc(s.name)}${s.custom ? ' <span class="pill">custom</span>' : ''}</td><td>${TERMS[s.term]}</td><td class="small">${esc(MODELS[s.model].split(' (')[0])}</td>
@@ -51,7 +51,12 @@ export function renderSettings() {
   $('#form').onchange = e => { lg.settings.form = e.target.value; changed(); };
   for (const b of $$('[data-active]')) b.onchange = () => {
     const s = lg.sports[b.dataset.active]; s.active = b.checked;
-    toast(b.checked ? `${s.name} is on${count(s.id) ? '' : ' (no programs yet: add some)'}.` : `${s.name} is off. Its history stays.`);
+    if (b.checked) {
+      // Schools that have the sport in real life get their programs.
+      const added = seedSport(lg, s.id);
+      const when = eff === lg.currentYear ? 'this year' : `from ${yearLabel(eff)}`;
+      toast(`${s.name} is on${added ? ` with ${added} program${added === 1 ? '' : 's'} (${when})` : count(s.id) ? '' : '. No school has it yet: add programs'}.`);
+    } else toast(`${s.name} is off. Its programs and history stay.`);
     changed();
   };
   for (const b of $$('[data-bulk]')) b.onclick = () => bulkPrograms(b.dataset.bulk);

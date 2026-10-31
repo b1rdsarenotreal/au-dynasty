@@ -2,12 +2,12 @@
 // schedules for every active sport), play the calendar week by week, crown
 // champions, then roll the dynasty into the next year.
 
-import { activeSports, programsIn, confOf, curYear, newYear } from './league.js?v=20261030221621';
-import { buildSchedule } from './schedule.js?v=20261030221621';
-import { postStart, LAST_WEEK } from './sports.js?v=20261030221621';
-import { play, winner, winProbability } from './game.js?v=20261030221621';
-import { selectField, buildBracket, advance, seedOf } from './postseason.js?v=20261030221621';
-import { clamp, normal, rng as makeRng, hashStr } from './util.js?v=20261030221621';
+import { activeSports, programsIn, confOf, curYear, newYear } from './league.js?v=20261030222729';
+import { buildSchedule } from './schedule.js?v=20261030222729';
+import { postStart, LAST_WEEK } from './sports.js?v=20261030222729';
+import { play, winner, winProbability } from './game.js?v=20261030222729';
+import { selectField, buildBracket, advance, seedOf } from './postseason.js?v=20261030222729';
+import { clamp, normal, rng as makeRng, hashStr } from './util.js?v=20261030222729';
 
 export const FORM_LEVELS = { none: 0, small: 0.5, normal: 1, big: 1.6 };
 const MAX_DRIFT = 8;

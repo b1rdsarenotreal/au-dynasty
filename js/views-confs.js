@@ -2,9 +2,9 @@
 // full and affiliate members, and realignment. The commissioner makes every
 // move; nothing realigns on its own.
 
-import { app, esc, VY, L, $, $$, changed, toast, school, confBadge, confHref, sportHref, schoolHref, openModal, options } from './ui.js?v=20261030221621';
-import { yearLabel, conferencesIn, confRoster, confMembers, confOf, effectiveYear, createConference, dissolveConference, joinConference, leaveConference, hasProgram, homeConf, programsIn, activeSports } from './league.js?v=20261030221621';
-import { TERMS } from './sports.js?v=20261030221621';
+import { app, esc, VY, L, $, $$, changed, toast, school, confBadge, confHref, sportHref, schoolHref, openModal, options } from './ui.js?v=20261030222729';
+import { yearLabel, conferencesIn, confRoster, confMembers, confOf, effectiveYear, createConference, dissolveConference, joinConference, leaveConference, hasProgram, homeConf, programsIn, activeSports } from './league.js?v=20261030222729';
+import { TERMS } from './sports.js?v=20261030222729';
 
 const COLORS = ['#1d4f91', '#b3192f', '#17784a', '#6b3fa0', '#c25e00', '#0f6e7a', '#8a1538', '#3a4a5c', '#a8740c', '#2b6cb0'];
 

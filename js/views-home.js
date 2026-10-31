@@ -1,10 +1,10 @@
 // Home: where the year stands, the calendar of every sport, the buttons that
 // move the year forward, and the latest results.
 
-import { app, esc, VY, L, changed, toast, school, sportHref, gameCard, bindGameCards, confBadge } from './ui.js?v=20261030221621';
-import { yearLabel, weekLabel, activeSports, conferencesIn, weekStart, curYear } from './league.js?v=20261030221621';
-import { startSeason, simWeek, simUntil, startNextYear } from './season.js?v=20261030221621';
-import { postStart, LAST_WEEK, TERMS } from './sports.js?v=20261030221621';
+import { app, esc, VY, L, changed, toast, school, sportHref, gameCard, bindGameCards, confBadge } from './ui.js?v=20261030222729';
+import { yearLabel, weekLabel, activeSports, conferencesIn, weekStart, curYear } from './league.js?v=20261030222729';
+import { startSeason, simWeek, simUntil, startNextYear } from './season.js?v=20261030222729';
+import { postStart, LAST_WEEK, TERMS } from './sports.js?v=20261030222729';
 
 const WEEKS = LAST_WEEK + 2;
 

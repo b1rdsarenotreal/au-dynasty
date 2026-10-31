@@ -1,13 +1,13 @@
 // Sport pages: standings by conference, the schedule week by week, RPI
 // rankings, the national championship bracket, and team ratings.
 
-import { app, esc, VY, L, $, $$, changed, school, confBadge, sportHref, gameCard, bindGameCards, options, toast } from './ui.js?v=20261030221621';
-import { programsIn, confOf, weekLabel, yearLabel, program } from './league.js?v=20261030221621';
-import { records, rpi, rpiRanking, confStandings, fmtRec, winPct, fmtPct, ovrOf } from './standings.js?v=20261030221621';
-import { selectField, roundName, seedOf } from './postseason.js?v=20261030221621';
-import { winner } from './game.js?v=20261030221621';
-import { postStart, MODELS, TERMS, GENDER } from './sports.js?v=20261030221621';
-import { clamp } from './util.js?v=20261030221621';
+import { app, esc, VY, L, $, $$, changed, school, confBadge, sportHref, gameCard, bindGameCards, options, toast } from './ui.js?v=20261030222729';
+import { programsIn, confOf, weekLabel, yearLabel, program } from './league.js?v=20261030222729';
+import { records, rpi, rpiRanking, confStandings, fmtRec, winPct, fmtPct, ovrOf } from './standings.js?v=20261030222729';
+import { selectField, roundName, seedOf } from './postseason.js?v=20261030222729';
+import { winner } from './game.js?v=20261030222729';
+import { postStart, MODELS, TERMS, GENDER } from './sports.js?v=20261030222729';
+import { clamp } from './util.js?v=20261030222729';
 
 const TABS = { standings: 'Standings', schedule: 'Schedule', rankings: 'Rankings', championship: 'Championship', teams: 'Teams' };
 
@@ -22,7 +22,7 @@ export function renderSports() {
   const active = Object.values(lg.sports).filter(s => s.active), off = Object.values(lg.sports).filter(s => !s.active);
   app.innerHTML = `<div class="section-head"><h1>Sports</h1><span class="muted">${yearLabel(Y.year)}</span></div>
     ${Object.entries(TERMS).map(([t, label]) => { const l = active.filter(s => s.term === t); return l.length ? `<h2>${label}</h2><div class="grid narrow" style="margin-bottom:18px">${l.map(card).join('')}</div>` : ''; }).join('')}
-    ${off.length ? `<div class="card"><h2>Not being played yet</h2><p class="muted">${off.map(s => esc(s.name)).join(' · ')}</p><p class="note">Turn a sport on in <a href="#/settings">Settings</a>, then give schools programs on their pages (or all at once in Settings).</p></div>` : ''}`;
+    ${off.length ? `<div class="card"><h2>Not being played yet</h2><p class="muted">${off.map(s => esc(s.name)).join(' · ')}</p><p class="note">Turn a sport on in <a href="#/settings">Settings</a> and every school that has it in real life gets its program.</p></div>` : ''}`;
 }
 
 export function renderSport([id, tab = 'standings', arg]) {

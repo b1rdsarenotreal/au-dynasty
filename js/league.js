@@ -8,10 +8,10 @@
 // A record with { from, to } is in effect for from <= year < to (to = null
 // means still in effect).
 
-import { SCHOOLS } from './schools.js?v=20261030221621';
-import { SPORT_CATALOG } from './sports.js?v=20261030221621';
-import { SEED_PROGRAMS, STARTER_SPORTS } from './seed.js?v=20261030221621';
-import { clamp } from './util.js?v=20261030221621';
+import { SCHOOLS } from './schools.js?v=20261030222729';
+import { SPORT_CATALOG } from './sports.js?v=20261030222729';
+import { seedFor, STARTER_SPORTS } from './seed.js?v=20261030222729';
+import { clamp } from './util.js?v=20261030222729';
 
 export const START_YEAR = 2030;
 export const yearLabel = y => `${y}–${String((y + 1) % 100).padStart(2, '0')}`;
@@ -31,12 +31,23 @@ export function newLeague() {
   };
   for (const s of SCHOOLS) L.schools[s.id] = { ...s, joined: START_YEAR };
   for (const s of SPORT_CATALOG) L.sports[s.id] = structuredClone({ ...s, active: STARTER_SPORTS.includes(s.id), custom: false });
-  for (const p of SEED_PROGRAMS) {
-    if (!L.schools[p.school] || !L.sports[p.sport]) continue;
-    L.programs[pkey(p.school, p.sport)] = { school: p.school, sport: p.sport, off: p.off, def: p.def, prestige: p.prestige ?? (p.off + p.def) / 2, from: START_YEAR, to: null, level: p.level || '', note: p.note || '' };
-  }
   L.years[START_YEAR] = newYear(START_YEAR);
+  for (const id of STARTER_SPORTS) seedSport(L, id);
   return L;
+}
+
+// Give every school that has this sport in real life its program, starting
+// in the effective year. Schools that ever had a program in the sport in this
+// dynasty (including ones the commissioner dropped) are left alone.
+export function seedSport(L, sport) {
+  const year = effectiveYear(L);
+  let n = 0;
+  for (const p of seedFor(sport, Object.keys(L.schools))) {
+    if (!L.schools[p.school] || L.programs[pkey(p.school, sport)]) continue;
+    L.programs[pkey(p.school, sport)] = { school: p.school, sport, off: p.off, def: p.def, prestige: p.prestige, from: year, to: null, level: p.level || '', note: p.note || '' };
+    n++;
+  }
+  return n;
 }
 
 export function newYear(year) { return { year, phase: 'preseason', week: 0, sports: {} }; }
@@ -159,14 +170,16 @@ export function addProgram(L, school, sport, { off = 45, def = 45 } = {}) {
 export function dropProgram(L, school, sport) {
   const year = effectiveYear(L), p = program(L, school, sport);
   if (!p || !live(p, year)) return;
-  if (p.from >= year) delete L.programs[pkey(school, sport)]; else p.to = year;
+  // Keep a dropped program on record (even one that never played) so turning
+  // the sport off and on again does not bring it back.
+  p.to = Math.max(p.from, year);
   note(L, year, `${schoolName(L, school)} dropped ${L.sports[sport].name}.`);
 }
 
 export function addSchool(L, data) {
   const id = data.id || data.short.toLowerCase().replace(/[^a-z0-9]+/g, '');
   if (L.schools[id]) throw new Error(`A school with id "${id}" already exists.`);
-  L.schools[id] = { id, name: data.name, short: data.short, mascot: data.mascot || '', city: data.city || '', state: data.state || '', country: data.country || 'US', colors: data.colors || ['#33475b', '#ffffff'], aau: null, private: !!data.private, joined: effectiveYear(L) };
+  L.schools[id] = { id, name: data.name, short: data.short, mascot: data.mascot || '', city: data.city || '', state: data.state || '', country: data.country || 'US', colors: data.colors || ['#33475b', '#ffffff'], logo: data.logo || '', aau: null, private: !!data.private, joined: effectiveYear(L) };
   note(L, effectiveYear(L), `${data.short} joined the association.`);
   return id;
 }

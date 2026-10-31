@@ -68,15 +68,27 @@ Four game models cover them all:
   with run rules and softball's extra-inning tiebreaker.
 - **Sets**: volleyball by rally scoring; beach volleyball as five pairs.
 
-Football, women's basketball and softball are on at the start. Turn other
-sports on in **Settings**, then give schools programs (one school at a time
-on its page, or many at once in Settings). **Add a sport** copies an existing
-sport's model and format under a new name.
+Football, women's basketball and softball are on at the start. Turning
+another sport on in **Settings** gives a program to every AAU school that has
+that sport in real life (from the current year in the preseason, otherwise
+from next year). Programs you dropped stay dropped. More programs can be added
+one school at a time on its page, or many at once in Settings. **Add a
+sport** copies an existing sport's model and format under a new name.
 
 Each team has two ratings: **OFF** (scoring) and **DEF** (stopping the other
 team; pitching and fielding in baseball and softball). OVR is their average.
 Ratings move a little after every game based on how the result compared with
 the expected one.
+
+## Logos
+
+Logos load the same way as in MCS Dynasty: the college football logo list
+(ESPN logos) used there, plus ESPN's women's college basketball team list,
+which covers every Division I school, including those without football. Both
+are fetched by the browser and cached for 30 days. Schools neither list
+covers (most Division III schools, McGill and Toronto) show a monogram in
+their colors. **Edit school** takes a logo link or an uploaded image for any
+school.
 
 ## Championships
 
@@ -109,8 +121,13 @@ Ranked programs are placed by their final ranking and record. Unranked
 programs are placed by their level and recent results, which involves some
 judgment. All ratings can be edited on each sport's **Teams** tab.
 
-Data for the other sports is a next step; until then their programs start
-at whatever rating you give them.
+For the other sports, which schools have them comes from Wikipedia's lists
+of NCAA programs (Division I soccer, volleyball, field hockey, ice hockey,
+lacrosse, baseball, men's volleyball, beach volleyball, and men's water polo
+championship appearances); Division III, Canadian and women's water polo
+sponsorship is from general knowledge. Their ratings are **estimates** for
+now (a base by level, with well-known strong programs raised), to be
+replaced by a Wikipedia pass sport by sport.
 
 ## Development
 
@@ -126,6 +143,7 @@ python3 tests/ui_test.py    # browser test (Playwright + Chromium)
 | File | What it does |
 |---|---|
 | `js/schools.js` | The 73 AAU members |
+| `js/logos.js` | Logo lookup and uploads |
 | `js/sports.js` | Sport catalog and settings |
 | `js/seed.js` | Starting programs and ratings |
 | `js/league.js` | Data model: programs, conferences, memberships, calendar |

@@ -2,10 +2,11 @@
 // department (every sport it sponsors), its conference memberships, and
 // department expansion (adding or dropping programs).
 
-import { app, esc, VY, L, $, $$, changed, toast, school, badge, confBadge, sportHref, schoolHref, openModal, options, readableOn } from './ui.js?v=20261030221621';
-import { yearLabel, homeConf, membershipsOf, confOf, program, hasProgram, effectiveYear, addProgram, dropProgram, leaveConference, joinConference, conferencesIn, addSchool } from './league.js?v=20261030221621';
-import { records, fmtRec } from './standings.js?v=20261030221621';
-import { TERMS } from './sports.js?v=20261030221621';
+import { app, esc, VY, L, $, $$, changed, toast, school, badge, confBadge, sportHref, schoolHref, openModal, options, readableOn } from './ui.js?v=20261030222729';
+import { yearLabel, homeConf, membershipsOf, confOf, program, hasProgram, effectiveYear, addProgram, dropProgram, leaveConference, joinConference, conferencesIn, addSchool } from './league.js?v=20261030222729';
+import { records, fmtRec } from './standings.js?v=20261030222729';
+import { TERMS } from './sports.js?v=20261030222729';
+import { logoFor, imageFileToDataUrl } from './logos.js?v=20261030222729';
 
 export function renderSchools() {
   const lg = L(), Y = VY();
@@ -36,12 +37,28 @@ function schoolForm(id) {
         <label class="field">Primary color<input type="color" id="f-c1" value="${s.colors[0]}"></label>
         <label class="field">Secondary color<input type="color" id="f-c2" value="${s.colors[1]}"></label>
       </div>
+      <div class="stack"><div class="small muted">Logo</div>
+        <div class="logo-preview"><span id="f-prev"></span>
+          <input type="text" id="f-logo" placeholder="Image link (https://…), or upload a file" value="${esc(s.logo && !s.logo.startsWith('data:') ? s.logo : '')}" style="flex:1">
+          <label class="btn sm">Upload<input type="file" id="f-file" accept="image/*" hidden></label>
+          <button class="btn sm" id="f-clear">Use default</button></div>
+        <p class="note">Most Division I logos load automatically. Set one here for schools without one, or to use a different logo.</p></div>
     </div>
     <div class="modal-foot"><button class="btn primary" id="f-save">${id ? 'Save' : 'Add school'}</button></div>`, m => {
+    let logo = s.logo || '';
+    const auto = () => logoFor({ ...s, id: id || '', logo: '' });
+    const preview = () => { const u = logo || auto(); $('#f-prev', m).innerHTML = u ? `<img src="${esc(u)}" alt="" width="44" height="44" style="object-fit:contain" referrerpolicy="no-referrer">` : '<span class="muted small">No logo</span>'; };
+    preview();
+    $('#f-logo', m).onchange = e => { logo = e.target.value.trim(); preview(); };
+    $('#f-clear', m).onclick = () => { logo = ''; $('#f-logo', m).value = ''; preview(); };
+    $('#f-file', m).onchange = async e => {
+      try { logo = await imageFileToDataUrl(e.target.files[0]); $('#f-logo', m).value = ''; preview(); }
+      catch (err) { toast(err.message, true); }
+    };
     $('#f-save', m).onclick = () => {
       const v = k => $(`#f-${k}`, m).value.trim();
       if (!v('name') || !v('short')) return toast('A school needs a full name and a short name.', true);
-      const data = { name: v('name'), short: v('short'), mascot: v('mascot'), city: v('city'), state: v('state'), country: v('country'), colors: [v('c1'), v('c2')] };
+      const data = { name: v('name'), short: v('short'), mascot: v('mascot'), city: v('city'), state: v('state'), country: v('country'), colors: [v('c1'), v('c2')], logo };
       try {
         if (id) Object.assign(lg.schools[id], data);
         else { const nid = addSchool(lg, data); location.hash = schoolHref(nid); }

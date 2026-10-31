@@ -1,10 +1,11 @@
 // Shared UI pieces: the league in memory, saving, school and conference
 // labels, game cards, the game detail dialog and small form helpers.
 
-import { saveLeague } from './store.js?v=20261030221621';
-import { esc } from './util.js?v=20261030221621';
-import { winner } from './game.js?v=20261030221621';
-import { weekLabel, yearLabel } from './league.js?v=20261030221621';
+import { saveLeague } from './store.js?v=20261030222729';
+import { esc } from './util.js?v=20261030222729';
+import { winner } from './game.js?v=20261030222729';
+import { weekLabel, yearLabel } from './league.js?v=20261030222729';
+import { logoFor } from './logos.js?v=20261030222729';
 
 export { esc };
 export const ctx = { league: null, render: () => {} };
@@ -51,7 +52,11 @@ export function badge(id, size = 20) {
   const [c1, c2] = s.colors;
   const txt = initials(s, size);
   const fs = Math.round(size * (txt.length > 3 ? 0.34 : txt.length > 2 ? 0.4 : txt.length > 1 ? 0.5 : 0.62));
-  return `<span class="tbadge" style="--tc:${c1};--ta:${c2};--tt:${readableOn(c1)};width:${size}px;height:${size}px;font-size:${fs}px">${esc(txt)}</span>`;
+  const mono = `<span class="tbadge" style="--tc:${c1};--ta:${c2};--tt:${readableOn(c1)};width:${size}px;height:${size}px;font-size:${fs}px">${esc(txt)}</span>`;
+  const url = logoFor(s);
+  if (!url) return mono;
+  // If the image fails to load, the monogram takes its place.
+  return `<span class="logo" style="width:${size}px;height:${size}px" data-fb="${esc(mono)}"><img src="${esc(url)}" alt="" width="${size}" height="${size}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.outerHTML=this.parentNode.dataset.fb"></span>`;
 }
 
 export const schoolHref = id => `#/school/${encodeURIComponent(id)}`;

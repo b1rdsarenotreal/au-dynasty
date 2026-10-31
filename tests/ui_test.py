@@ -68,6 +68,23 @@ with sync_playwright() as p:
     assert "Drop" in page.locator("tr", has_text="Football").first.inner_text()
     ok(page, "school"); shot(page, "04-school-preseason")
 
+    # Turning a sport on brings in its real-life programs.
+    page.goto(URL + "#/settings"); page.wait_for_timeout(150)
+    page.check("[data-active='mih']"); page.wait_for_timeout(200)
+    row = page.locator("tr", has=page.locator("[data-active='mih']")).inner_text()
+    assert "17" in row, row  # 15 NCAA programs plus McGill and Toronto
+    page.goto(URL + "#/school/michigan"); page.wait_for_timeout(150)
+    assert "Drop" in page.locator("tr", has_text="Men's Ice Hockey").first.inner_text()
+
+    # A logo set by hand shows up.
+    page.goto(URL + "#/school/washu"); page.wait_for_timeout(150)
+    page.click("#edit")
+    page.fill("#f-logo", "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMCAxMCc+PGNpcmNsZSBjeD0nNScgY3k9JzUnIHI9JzUnIGZpbGw9JyNhNTE0MTcnLz48L3N2Zz4=")
+    page.dispatch_event("#f-logo", "change")
+    page.click("#f-save"); page.wait_for_timeout(200)
+    assert page.locator(".team-hero .logo img").count() == 1, "custom logo missing"
+    shot(page, "04b-school-logo")
+
     page.goto(URL + "#/home"); page.wait_for_timeout(150)
     page.click("#start"); page.wait_for_timeout(300)
     page.click("#week"); page.wait_for_timeout(300)

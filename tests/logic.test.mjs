@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import { SCHOOLS } from '../js/schools.js';
 import { SPORT_CATALOG } from '../js/sports.js';
-import { SEED_PROGRAMS } from '../js/seed.js';
-import { newLeague, createConference, joinConference, leaveConference, confOf, confMembers, addProgram, dropProgram, hasProgram, effectiveYear, dissolveConference, addSchool, addSport, weekStart, curYear } from '../js/league.js';
+import { SEED_PROGRAMS, seedFor } from '../js/seed.js';
+import { logoFor, setTables, gistTable, espnTable } from '../js/logos.js';
+import { newLeague, seedSport, program, createConference, joinConference, leaveConference, confOf, confMembers, addProgram, dropProgram, hasProgram, effectiveYear, dissolveConference, addSchool, addSport, weekStart, curYear } from '../js/league.js';
 import { buildSchedule, roundRobin } from '../js/schedule.js';
 import { startSeason, simWeek, simUntil, startNextYear } from '../js/season.js';
 import { records, rpi } from '../js/standings.js';
@@ -188,6 +189,53 @@ test('new schools and sports', () => {
   startSeason(L);
   assert.ok(curYear(L).sports.w3x3);
   assert.ok(curYear(L).sports.wbb.teams[id]);
+});
+
+test('every sport has real-life sponsors that are AAU schools', () => {
+  const ids = SCHOOLS.map(s => s.id), known = new Set(ids);
+  for (const sport of SPORT_CATALOG) {
+    const list = seedFor(sport.id, ids);
+    assert.ok(list.length >= 8, `${sport.id}: only ${list.length} programs`);
+    for (const p of list) { assert.ok(known.has(p.school), `${sport.id}: ${p.school}`); assert.ok(p.off >= 20 && p.off <= 99 && p.def >= 20 && p.def <= 99); }
+    assert.equal(new Set(list.map(p => p.school)).size, list.length, `${sport.id} duplicates`);
+  }
+  assert.equal(seedFor('mbb', ids).length, 73);
+});
+
+test('turning a sport on adds its real-life programs once, and respects drops', () => {
+  const L = newLeague();
+  assert.equal(Object.values(L.programs).filter(p => p.sport === 'mih').length, 0);
+  const n = seedSport(L, 'mih');
+  assert.ok(n >= 15);
+  assert.ok(program(L, 'michigan', 'mih'));
+  assert.ok(!program(L, 'texas', 'mih'));
+  dropProgram(L, 'michigan', 'mih');
+  assert.equal(seedSport(L, 'mih'), 0);
+  assert.equal(hasProgram(L, 'michigan', 'mih', 2030), false);
+  // Mid-season activation starts programs next year.
+  startSeason(L);
+  seedSport(L, 'mlax');
+  assert.equal(hasProgram(L, 'jhu', 'mlax', 2030), false);
+  assert.equal(hasProgram(L, 'jhu', 'mlax', 2031), true);
+});
+
+test('logos: own logo, football list, then ESPN by full name', () => {
+  setTables({
+    gist: gistTable('school,logo,alt_name1\nMichigan,http://a/mich.png,UM\nMiami,https://a/miami.png,\nPittsburgh,https://a/pitt.png,Pitt\n'),
+    espn: espnTable({ sports: [{ leagues: [{ teams: [
+      { team: { displayName: 'UC San Diego Tritons', location: 'UC San Diego', logos: [{ href: 'https://e/ucsd.png' }] } },
+      { team: { displayName: 'Washington Huskies', location: 'Washington', logos: [{ href: 'https://e/uw.png' }] } },
+    ] }] }] }),
+  });
+  const S = Object.fromEntries(SCHOOLS.map(s => [s.id, s]));
+  assert.equal(logoFor(S.michigan), 'https://a/mich.png');
+  assert.equal(logoFor(S.miami), 'https://a/miami.png');
+  assert.equal(logoFor(S.pitt), 'https://a/pitt.png');
+  assert.equal(logoFor(S.ucsd), 'https://e/ucsd.png');
+  assert.equal(logoFor(S.washington), 'https://e/uw.png');
+  assert.equal(logoFor(S.washu), null);
+  assert.equal(logoFor({ ...S.washu, logo: 'data:image/png;base64,xx' }), 'data:image/png;base64,xx');
+  setTables(null);
 });
 
 console.log(`${passed} tests passed`);

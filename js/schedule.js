@@ -8,8 +8,8 @@
 // 3. Everyone's remaining games are filled with non-conference opponents,
 //    earliest slots first, avoiding conference mates and repeat opponents.
 
-import { slotGames } from './sports.js?v=20261030221621';
-import { shuffle, rng as makeRng, hashStr } from './util.js?v=20261030221621';
+import { slotGames } from './sports.js?v=20261030222729';
+import { shuffle, rng as makeRng, hashStr } from './util.js?v=20261030222729';
 
 export function buildSlots(sport) {
   const out = [];

@@ -1,13 +1,14 @@
 // App shell: loading the dynasty, the top bar, and page routing.
 
-import { loadLeague, saveLeague } from './store.js?v=20261030221621';
-import { newLeague, migrateLeague, yearLabel } from './league.js?v=20261030221621';
-import { ctx, app, persist, esc } from './ui.js?v=20261030221621';
-import { renderHome } from './views-home.js?v=20261030221621';
-import { renderSports, renderSport } from './views-sports.js?v=20261030221621';
-import { renderSchools, renderSchool } from './views-schools.js?v=20261030221621';
-import { renderConferences, renderConference } from './views-confs.js?v=20261030221621';
-import { renderHistory, renderSettings } from './views-admin.js?v=20261030221621';
+import { loadLeague, saveLeague } from './store.js?v=20261030222729';
+import { newLeague, migrateLeague, yearLabel } from './league.js?v=20261030222729';
+import { ctx, app, persist, esc } from './ui.js?v=20261030222729';
+import { renderHome } from './views-home.js?v=20261030222729';
+import { renderSports, renderSport } from './views-sports.js?v=20261030222729';
+import { renderSchools, renderSchool } from './views-schools.js?v=20261030222729';
+import { renderConferences, renderConference } from './views-confs.js?v=20261030222729';
+import { renderHistory, renderSettings } from './views-admin.js?v=20261030222729';
+import { loadLogos } from './logos.js?v=20261030222729';
 
 const VIEWS = { home: 'Home', sports: 'Sports', schools: 'Schools', conferences: 'Conferences', history: 'History', settings: 'Settings' };
 const SUBVIEWS = { sport: 'sports', school: 'schools', conference: 'conferences' };
@@ -48,6 +49,8 @@ async function boot() {
   if (!league.years[league.viewYear]) league.viewYear = league.currentYear;
   ctx.league = league;
   render();
+  // Logos load in the background; redraw once they're in.
+  loadLogos().then(() => render()).catch(() => {});
 }
 
 boot().catch(e => {
