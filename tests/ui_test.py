@@ -89,14 +89,54 @@ with sync_playwright() as p:
     page.click("#start"); page.wait_for_timeout(300)
     page.click("#week"); page.wait_for_timeout(300)
     ok(page, "home week 1"); shot(page, "05-home-week1")
-    page.click("#all"); page.wait_for_timeout(1500)
+    page.click("#fall"); page.wait_for_timeout(800)
+    page.goto(URL + "#/sport/fb/championship"); page.wait_for_timeout(150); ok(page, "fb champ"); shot(page, "05b-fb-champ")
+    page.goto(URL + "#/home"); page.wait_for_timeout(150)
+    page.click("#winter"); page.wait_for_timeout(800)
+
+    # Softball: stop when its conference tournaments are drawn, edit one.
+    for _ in range(20):
+        if "Softball: conference tournaments are drawn" in page.locator("#app").inner_text(): break
+        page.click("#week"); page.wait_for_timeout(150)
+    page.goto(URL + "#/sport/sb/tournaments"); page.wait_for_timeout(150); ok(page, "sb tournaments")
+    page.locator("[data-ct-edit]").first.click(); page.wait_for_timeout(100)
+    page.select_option("#t-kind", "pool"); page.fill("#t-size", "4"); page.dispatch_event("#t-size", "change")
+    page.click("#t-save"); page.wait_for_timeout(200)
+    assert "Pool play" in page.locator("#app").inner_text()
+    shot(page, "06a-sb-tournaments")
+
+    # Then stop when the field is ready: confirm teams, move a seed, announce.
+    page.goto(URL + "#/home"); page.wait_for_timeout(150)
+    for _ in range(5):
+        if "Softball: the field is ready" in page.locator("#app").inner_text(): break
+        page.click("#week"); page.wait_for_timeout(150)
+    page.goto(URL + "#/sport/sb/selection"); page.wait_for_timeout(150); ok(page, "selection board")
+    shot(page, "06b-sb-selection-board")
+    page.click("#sel-confirm"); page.wait_for_timeout(200)
+    page.click("[data-sdn='0']"); page.wait_for_timeout(150)
+    ok(page, "seeding"); shot(page, "06c-sb-seeding")
+    page.click("#sel-announce"); page.wait_for_timeout(300)
+    ok(page, "announced"); shot(page, "06d-sb-announced")
+
+    page.goto(URL + "#/home"); page.wait_for_timeout(150)
+    page.click("#all"); page.wait_for_timeout(2000)
     assert "complete" in page.locator("#app").inner_text()
     shot(page, "06-home-complete")
 
+    # Championship format editor.
+    page.goto(URL + "#/settings"); page.wait_for_timeout(150)
+    page.click("[data-fmt-edit='sb']"); page.wait_for_timeout(150)
+    assert "The format works" in page.locator("dialog").inner_text()
+    page.fill("[data-s='0'][data-k='groups']", "6"); page.dispatch_event("[data-s='0'][data-k='groups']", "change"); page.wait_for_timeout(100)
+    assert "holds" in page.locator("dialog").inner_text()
+    shot(page, "06e-format-editor")
+    page.click("#f-default"); page.wait_for_timeout(100)
+    page.click("#f-save"); page.wait_for_timeout(150)
+
     for sport in ["fb", "wbb", "sb"]:
-        for tab in ["standings", "schedule", "rankings", "championship", "teams"]:
+        for tab in ["standings", "schedule", "rankings", "tournaments", "selection", "championship", "teams"]:
             page.goto(URL + f"#/sport/{sport}/{tab}"); page.wait_for_timeout(120); ok(page, f"{sport} {tab}")
-            if sport == "sb" or tab == "championship": shot(page, f"07-{sport}-{tab}")
+            if sport == "sb" or tab in ("championship", "tournaments"): shot(page, f"07-{sport}-{tab}")
     page.goto(URL + "#/sport/fb/schedule/michigan"); page.wait_for_timeout(120); ok(page, "team schedule")
     page.locator("[data-game]").first.click(); page.wait_for_timeout(150)
     assert page.locator("dialog[open] .lscore").count() == 1

@@ -2,9 +2,12 @@
 // full and affiliate members, and realignment. The commissioner makes every
 // move; nothing realigns on its own.
 
-import { app, esc, VY, L, $, $$, changed, toast, school, confBadge, confHref, sportHref, schoolHref, openModal, options } from './ui.js?v=20261030222729';
-import { yearLabel, conferencesIn, confRoster, confMembers, confOf, effectiveYear, createConference, dissolveConference, joinConference, leaveConference, hasProgram, homeConf, programsIn, activeSports } from './league.js?v=20261030222729';
-import { TERMS } from './sports.js?v=20261030222729';
+import { app, esc, VY, L, $, $$, changed, toast, school, confBadge, confHref, sportHref, schoolHref, openModal, options } from './ui.js?v=20261030224435';
+import { yearLabel, conferencesIn, confRoster, confMembers, confOf, effectiveYear, createConference, dissolveConference, joinConference, leaveConference, hasProgram, homeConf, programsIn, activeSports } from './league.js?v=20261030224435';
+import { confTourneySettings } from './champs.js?v=20261030224435';
+import { EVENT_KINDS, HOSTING } from './events.js?v=20261030224435';
+import { confTourneyForm } from './views-champ.js?v=20261030224435';
+import { TERMS } from './sports.js?v=20261030224435';
 
 const COLORS = ['#1d4f91', '#b3192f', '#17784a', '#6b3fa0', '#c25e00', '#0f6e7a', '#8a1538', '#3a4a5c', '#a8740c', '#2b6cb0'];
 
@@ -134,9 +137,16 @@ export function renderConference(id) {
         : `<p class="muted">No members yet.${cur ? ' Invite schools to join.' : ''}</p>`}
     </div>
     ${sponsors.length ? `<div class="card"><h2>Standings</h2><div class="row">${sponsors.filter(sp => Y.sports[sp]).map(sp => `<a class="btn" href="${sportHref(sp, 'standings')}">${esc(lg.sports[sp].name)}</a>`).join('') || `<span class="muted">Standings appear once the ${yearLabel(Y.year)} season starts.</span>`}</div></div>` : ''}
+    ${sponsors.length ? `<div class="card"><div class="section-head"><h2>Conference tournaments</h2></div>
+      <div class="table-wrap"><table><thead><tr><th>Sport</th><th>Teams</th><th>Format</th><th>Host</th><th></th></tr></thead><tbody>
+      ${sponsors.map(sp => { const t = confTourneySettings(lg, id, sp), own = !!c.tourney?.[sp]; const ev = lg.years[lg.currentYear]?.sports?.[sp]?.ct?.[id];
+        return `<tr><td>${esc(lg.sports[sp].name)}${own ? '' : ' <span class="pill">default</span>'}</td><td>${!t.size ? 'None' : t.size >= 99 ? 'Everyone' : `Top ${t.size}`}</td><td>${t.size ? `${EVENT_KINDS[t.kind]}${t.bestOf > 1 ? `, best of ${t.bestOf}` : ''}` : ''}</td><td>${t.size ? (t.hosting === 'school' ? `${esc(lg.schools[t.host]?.short || '—')} hosts` : t.hosting === 'venue' ? esc(t.venue?.name || 'Venue') : HOSTING[t.hosting]) : ''}</td>
+          <td class="num">${cur && !c.dissolved && !(ev && ev.started) ? `<button class="btn sm" data-ct="${sp}">Edit</button>` : ''}</td></tr>`; }).join('')}
+      </tbody></table></div><p class="note">Champions get the automatic bid when the conference has enough teams in the sport. With no tournament, the regular-season champion gets it.</p></div>` : ''}
     ${log.length ? `<div class="card"><h2>History</h2><ul class="log">${log.map(e => `<li><span class="y">${yearLabel(e.year)}</span><span>${esc(e.text)}</span></li>`).join('')}</ul></div>` : ''}`;
 
   $('#edit')?.addEventListener('click', () => confForm(id));
+  for (const b of $$('[data-ct]')) b.onclick = () => confTourneyForm(lg, b.dataset.ct, id, lg.years[lg.currentYear]?.sports?.[b.dataset.ct]);
   $('#add')?.addEventListener('click', () => addMembersForm(id));
   for (const b of $$('[data-leave]')) b.onclick = () => {
     const m = lg.memberships.find(x => x.id === b.dataset.leave);

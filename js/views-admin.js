@@ -1,11 +1,12 @@
 // History (champions and realignment log) and Settings (sports, rules,
 // saving and loading).
 
-import { app, esc, L, $, $$, changed, toast, school, sportHref, openModal, options, ctx, flushSave } from './ui.js?v=20261030222729';
-import { yearLabel, addSport, addProgram, hasProgram, effectiveYear, newLeague, migrateLeague, seedSport } from './league.js?v=20261030222729';
-import { MODELS, TERMS, GENDER } from './sports.js?v=20261030222729';
-import { exportLeague, saveLeague, clearLeague } from './store.js?v=20261030222729';
-import { FORM_LEVELS } from './season.js?v=20261030222729';
+import { app, esc, L, $, $$, changed, toast, school, sportHref, openModal, options, ctx, flushSave } from './ui.js?v=20261030224435';
+import { yearLabel, addSport, addProgram, hasProgram, effectiveYear, newLeague, migrateLeague, seedSport } from './league.js?v=20261030224435';
+import { MODELS, TERMS, GENDER } from './sports.js?v=20261030224435';
+import { exportLeague, saveLeague, clearLeague } from './store.js?v=20261030224435';
+import { formatForm } from './views-champ.js?v=20261030224435';
+import { FORM_LEVELS } from './season.js?v=20261030224435';
 
 export function renderHistory() {
   const lg = L();
@@ -30,7 +31,6 @@ export function renderSettings() {
     <div class="card stack"><h2>Dynasty</h2>
       <div class="form-grid">
         <label class="field">Name<input type="text" id="name" value="${esc(lg.name)}"></label>
-        <label class="field">Teams a conference needs for an automatic bid<input type="number" id="automin" min="2" max="20" value="${lg.settings.autoMin}"></label>
         <label class="field">How much ratings move during a season<select id="form">${options(Object.keys(FORM_LEVELS).map(k => [k, k[0].toUpperCase() + k.slice(1)]), lg.settings.form)}</select></label>
       </div></div>
     <div class="card"><div class="section-head"><h2>Sports</h2><div class="spacer"></div><button class="btn" id="newsport">Add a sport</button></div>
@@ -40,14 +40,13 @@ export function renderSettings() {
         <td>${s.active ? `<a href="${sportHref(s.id)}">${esc(s.name)}</a>` : esc(s.name)}${s.custom ? ' <span class="pill">custom</span>' : ''}</td><td>${TERMS[s.term]}</td><td class="small">${esc(MODELS[s.model].split(' (')[0])}</td>
         <td class="num">${count(s.id)}</td>
         <td><label class="check"><input type="checkbox" data-active="${s.id}" ${s.active ? 'checked' : ''}> ${s.active ? 'On' : 'Off'}</label></td>
-        <td class="num"><button class="btn sm" data-bulk="${s.id}">Add programs</button> <button class="btn sm" data-rules="${s.id}">Rules</button></td></tr>`).join('')}
+        <td class="num"><button class="btn sm" data-bulk="${s.id}">Add programs</button> <button class="btn sm" data-rules="${s.id}">Season</button> <button class="btn sm" data-fmt-edit="${s.id}">Championship</button></td></tr>`).join('')}
       </tbody></table></div></div>
     <div class="card stack"><h2>Save and load</h2>
       <p class="note">The dynasty saves in this browser automatically. Download a backup to keep it safe or move it to another device.</p>
       <div class="row"><button class="btn" id="export">Download backup</button><label class="btn">Load a backup<input type="file" id="import" accept=".json,application/json" hidden></label><div class="spacer"></div><button class="btn danger" id="reset">Start over</button></div></div>`;
 
   $('#name').onchange = e => { lg.name = e.target.value.trim() || 'AAU Dynasty'; changed(); };
-  $('#automin').onchange = e => { lg.settings.autoMin = Math.max(2, Number(e.target.value) || 6); changed(); };
   $('#form').onchange = e => { lg.settings.form = e.target.value; changed(); };
   for (const b of $$('[data-active]')) b.onchange = () => {
     const s = lg.sports[b.dataset.active]; s.active = b.checked;
@@ -61,6 +60,7 @@ export function renderSettings() {
   };
   for (const b of $$('[data-bulk]')) b.onclick = () => bulkPrograms(b.dataset.bulk);
   for (const b of $$('[data-rules]')) b.onclick = () => rulesForm(b.dataset.rules);
+  for (const b of $$('[data-fmt-edit]')) b.onclick = () => formatForm(lg, b.dataset.fmtEdit);
   $('#newsport').onclick = newSportForm;
   $('#export').onclick = async () => { await flushSave(); exportLeague(lg); };
   $('#import').onchange = async e => {
@@ -101,22 +101,19 @@ function bulkPrograms(sid) {
 function rulesForm(sid) {
   const lg = L(), s = lg.sports[sid];
   const n = (id, label, v, min = 1, max = 99) => `<label class="field">${label}<input type="number" id="${id}" value="${v}" min="${min}" max="${max}"></label>`;
-  openModal(`<div class="modal-head"><h2>${esc(s.name)} rules</h2><button class="btn ghost" data-close>Cancel</button></div>
+  openModal(`<div class="modal-head"><h2>${esc(s.name)} season</h2><button class="btn ghost" data-close>Cancel</button></div>
     <div class="modal-body stack">
       <div class="form-grid">
         ${n('s0', 'First week', s.season[0], 1, 46)}${n('s1', 'Last regular-season week', s.season[1], 1, 46)}
         ${n('games', 'Games per team', s.games, 1, 80)}${n('conf', 'Conference games', s.confGames, 0, 60)}
-        ${n('field', 'Championship field', s.post.field, 2, 64)}${n('series', 'Games per round (1 or 3)', s.post.series, 1, 5)}
-        ${n('neutral', 'Neutral sites from round', s.post.neutralFrom, 1, 7)}${n('perweek', 'Rounds per week', s.post.perWeek, 1, 6)}
       </div>
-      <p class="note">Changes apply to the next season that starts. Week 1 is the last week of August.</p>
+      <p class="note">Changes apply to the next season that starts. Week 1 is the last week of August. Conference tournaments are the week after the last regular-season week, and the national championship starts the week after that. The championship itself is edited with the Championship button.</p>
     </div>
     <div class="modal-foot"><button class="btn primary" id="go">Save</button></div>`, m => {
     $('#go', m).onclick = () => {
       const v = id => Number($(`#${id}`, m).value);
       if (v('s1') < v('s0')) return toast('The season has to end after it starts.', true);
       s.season = [v('s0'), v('s1')]; s.games = v('games'); s.confGames = v('conf');
-      Object.assign(s.post, { field: v('field'), series: v('series') % 2 ? v('series') : v('series') + 1, neutralFrom: v('neutral'), perWeek: v('perweek') });
       m.close(); changed();
     };
   });

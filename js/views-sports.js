@@ -1,15 +1,16 @@
 // Sport pages: standings by conference, the schedule week by week, RPI
 // rankings, the national championship bracket, and team ratings.
 
-import { app, esc, VY, L, $, $$, changed, school, confBadge, sportHref, gameCard, bindGameCards, options, toast } from './ui.js?v=20261030222729';
-import { programsIn, confOf, weekLabel, yearLabel, program } from './league.js?v=20261030222729';
-import { records, rpi, rpiRanking, confStandings, fmtRec, winPct, fmtPct, ovrOf } from './standings.js?v=20261030222729';
-import { selectField, roundName, seedOf } from './postseason.js?v=20261030222729';
-import { winner } from './game.js?v=20261030222729';
-import { postStart, MODELS, TERMS, GENDER } from './sports.js?v=20261030222729';
-import { clamp } from './util.js?v=20261030222729';
+import { app, esc, VY, L, $, $$, changed, school, confBadge, sportHref, gameCard, bindGameCards, options, toast } from './ui.js?v=20261030224435';
+import { programsIn, confOf, weekLabel, yearLabel, program } from './league.js?v=20261030224435';
+import { records, rpi, rpiRanking, confStandings, fmtRec, winPct, fmtPct, ovrOf } from './standings.js?v=20261030224435';
+import { selectField, roundName, seedOf } from './postseason.js?v=20261030224435';
+import { winner } from './game.js?v=20261030224435';
+import { postStart, MODELS, TERMS, GENDER } from './sports.js?v=20261030224435';
+import { tourneysTab, selectionTab, championshipTab, bindChampPages } from './views-champ.js?v=20261030224435';
+import { clamp } from './util.js?v=20261030224435';
 
-const TABS = { standings: 'Standings', schedule: 'Schedule', rankings: 'Rankings', championship: 'Championship', teams: 'Teams' };
+const TABS = { standings: 'Standings', schedule: 'Schedule', rankings: 'Rankings', tournaments: 'Conf. tournaments', selection: 'Selection', championship: 'Championship', teams: 'Teams' };
 
 export function renderSports() {
   const lg = L(), Y = VY();
@@ -33,13 +34,17 @@ export function renderSport([id, tab = 'standings', arg]) {
   const head = `<div class="section-head"><h1>${esc(sport.name)}</h1><span class="muted">${yearLabel(Y.year)} · ${TERMS[sport.term]} · ${GENDER[sport.gender] || ''}</span></div>
     <div class="tabs">${Object.entries(TABS).map(([k, l]) => `<a href="${sportHref(id, k)}" class="${k === tab ? 'active' : ''}">${l}</a>`).join('')}</div>`;
   if (!ss && tab !== 'teams') {
-    app.innerHTML = head + `<div class="card empty">${Y.phase === 'preseason' ? `The ${yearLabel(Y.year)} season hasn't started. Schedules are made when it does.` : `${esc(sport.name)} wasn't played in ${yearLabel(Y.year)}.`} <a href="${sportHref(id, 'teams')}">See the teams</a>.</div>`;
+    const fmt = tab === 'championship' && Y.year === lg.currentYear ? `<div class="row" style="justify-content:center;margin-top:10px"><button class="btn" data-fmt-edit="${id}">Edit the championship format</button></div>` : '';
+    app.innerHTML = head + `<div class="card empty">${Y.phase === 'preseason' ? `The ${yearLabel(Y.year)} season hasn't started. Schedules are made when it does.` : `${esc(sport.name)} wasn't played in ${yearLabel(Y.year)}.`} <a href="${sportHref(id, 'teams')}">See the teams</a>.${fmt}</div>`;
+    bindChampPages(lg, Y, sport, ss);
     return;
   }
-  const body = { standings: standingsTab, schedule: scheduleTab, rankings: rankingsTab, championship: champTab, teams: teamsTab }[tab](lg, Y, sport, ss, arg);
+  const champ = ss.post ? champTab : championshipTab;
+  const body = { standings: standingsTab, schedule: scheduleTab, rankings: rankingsTab, tournaments: tourneysTab, selection: selectionTab, championship: champ, teams: teamsTab }[tab](lg, Y, sport, ss, arg);
   app.innerHTML = head + body;
   bindGameCards();
   bind[tab]?.(lg, Y, sport, ss);
+  bindChampPages(lg, Y, sport, ss);
 }
 
 function standingsTab(lg, Y, sport, ss) {

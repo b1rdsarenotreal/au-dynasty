@@ -13,7 +13,7 @@
 // (women's basketball), 2026 final ESPN.com/USA Softball poll and 2026 NCAA
 // softball tournament (softball).
 
-import { hashStr } from './util.js?v=20261030222729';
+import { hashStr } from './util.js?v=20261030224435';
 
 export const STARTER_SPORTS = ['fb', 'wbb', 'sb'];
 

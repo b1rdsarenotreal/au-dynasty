@@ -2,11 +2,11 @@
 // department (every sport it sponsors), its conference memberships, and
 // department expansion (adding or dropping programs).
 
-import { app, esc, VY, L, $, $$, changed, toast, school, badge, confBadge, sportHref, schoolHref, openModal, options, readableOn } from './ui.js?v=20261030222729';
-import { yearLabel, homeConf, membershipsOf, confOf, program, hasProgram, effectiveYear, addProgram, dropProgram, leaveConference, joinConference, conferencesIn, addSchool } from './league.js?v=20261030222729';
-import { records, fmtRec } from './standings.js?v=20261030222729';
-import { TERMS } from './sports.js?v=20261030222729';
-import { logoFor, imageFileToDataUrl } from './logos.js?v=20261030222729';
+import { app, esc, VY, L, $, $$, changed, toast, school, badge, confBadge, sportHref, schoolHref, openModal, options, readableOn } from './ui.js?v=20261030224435';
+import { yearLabel, homeConf, membershipsOf, confOf, program, hasProgram, effectiveYear, addProgram, dropProgram, leaveConference, joinConference, conferencesIn, addSchool } from './league.js?v=20261030224435';
+import { records, fmtRec } from './standings.js?v=20261030224435';
+import { TERMS } from './sports.js?v=20261030224435';
+import { logoFor, imageFileToDataUrl } from './logos.js?v=20261030224435';
 
 export function renderSchools() {
   const lg = L(), Y = VY();

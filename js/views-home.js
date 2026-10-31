@@ -1,14 +1,19 @@
 // Home: where the year stands, the calendar of every sport, the buttons that
 // move the year forward, and the latest results.
 
-import { app, esc, VY, L, changed, toast, school, sportHref, gameCard, bindGameCards, confBadge } from './ui.js?v=20261030222729';
-import { yearLabel, weekLabel, activeSports, conferencesIn, weekStart, curYear } from './league.js?v=20261030222729';
-import { startSeason, simWeek, simUntil, startNextYear } from './season.js?v=20261030222729';
-import { postStart, LAST_WEEK, TERMS } from './sports.js?v=20261030222729';
+import { app, esc, VY, L, changed, toast, school, sportHref, gameCard, bindGameCards, confBadge } from './ui.js?v=20261030224435';
+import { yearLabel, weekLabel, activeSports, conferencesIn, weekStart, curYear } from './league.js?v=20261030224435';
+import { startSeason, simWeek, simUntil, startNextYear } from './season.js?v=20261030224435';
+import { postStart, LAST_WEEK, TERMS } from './sports.js?v=20261030224435';
 
 const WEEKS = LAST_WEEK + 2;
 
-function postWeeks(sport) { let r = 0, n = 1; while (n < sport.post.field) { n *= 2; r++; } return Math.ceil(r / sport.post.perWeek); }
+// Weeks after the regular season: conference tournaments, then each stage
+// of the championship (a one-site bracket played a round a week takes longer).
+function postWeeks(sport) {
+  const st = sport.champ?.stages || [];
+  return 1 + st.reduce((sum, s) => { let r = 0, n = 1; while (n < s.size) { n *= 2; r++; } return sum + (s.kind === 'single' ? Math.ceil(r / (s.roundsPerWeek || 99)) : 1); }, 0);
+}
 
 function calendar(lg, Y, sports) {
   const pos = w => `${((w - 1) / WEEKS) * 100}%`;
@@ -20,12 +25,24 @@ function calendar(lg, Y, sports) {
   }
   const now = Y.phase === 'season' ? `<div class="now" style="left:${pos(Y.week)}"></div>` : '';
   const rows = sports.map(s => {
-    const ps = postStart(s), pe = ps + postWeeks(s);
+    const ps = s.season[1] + 1, pe = ps + postWeeks(s);
     return `<div class="lab"><a href="${sportHref(s.id)}">${esc(s.name)}</a></div><div class="track">
       <div class="seg reg" style="left:${pos(s.season[0])};width:calc(${pos(s.season[1] + 1)} - ${pos(s.season[0])})" title="Regular season"></div>
       <div class="seg post" style="left:${pos(ps)};width:calc(${pos(pe)} - ${pos(ps)})" title="Championship"></div>${now}</div>`;
   }).join('');
   return `<div class="cal"><div></div><div class="months">${months.join('')}</div>${rows}</div>`;
+}
+
+// What's waiting for the commissioner this week: conference tournaments that
+// can still be edited, and fields to pick.
+function postNotes(lg, Y) {
+  const notes = [];
+  for (const [id, ss] of Object.entries(Y.sports)) {
+    const sp = lg.sports[id];
+    if (ss.sel && ss.sel.status !== 'announced') notes.push(`<a href="${sportHref(id, 'selection')}">${esc(sp.name)}: the field is ready to pick</a>; it's announced when ${esc(weekLabel(Y.year, (ss.regEnd ?? sp.season[1]) + 2))} is played.`);
+    else if (ss.ct && Object.values(ss.ct).some(e => !e.started) && !ss.sel) notes.push(`<a href="${sportHref(id, 'tournaments')}">${esc(sp.name)}: conference tournaments are drawn</a> and can be changed until they start.`);
+  }
+  return notes.length ? `<div class="card"><h2>Postseason</h2><ul class="log">${notes.map(n => `<li>${n}</li>`).join('')}</ul></div>` : '';
 }
 
 export function renderHome() {
@@ -61,9 +78,10 @@ export function renderHome() {
       <div class="kpi"><div class="v">${confs.length}</div><div class="l">Conferences</div></div>
     </div>
     <div class="card stack">${actions}</div>
+    ${cur && Y.phase === 'season' ? postNotes(lg, Y) : ''}
     ${!confs.length && cur && Y.phase === 'preseason' ? `<div class="card"><h2>No conferences yet</h2><p>The AAU starts with a blank map. Go to <a href="#/conferences">Conferences</a> to found the first ones and invite members. Teams without a conference play a full independent schedule.</p></div>` : ''}
     ${champs.length ? `<div class="card"><h2>Champions</h2><table><tbody>${champs.map(([id, ss]) => `<tr><td><a href="${sportHref(id, 'championship')}">${esc(lg.sports[id].name)}</a></td><td>${school(ss.champion)}</td><td>${confBadge(ss.conf[ss.champion])}</td></tr>`).join('')}</tbody></table></div>` : ''}
-    <div class="card"><h2>Calendar</h2><p class="note">Blue is the regular season, gold the national championship.${Y.phase === 'season' ? ' The red line is this week.' : ''}</p>${calendar(lg, Y, sports)}</div>
+    <div class="card"><h2>Calendar</h2><p class="note">Blue is the regular season, gold the conference tournaments and national championship.${Y.phase === 'season' ? ' The red line is this week.' : ''}</p>${calendar(lg, Y, sports)}</div>
     ${recent.length ? `<div class="card"><h2>Results · ${esc(weekLabel(Y.year, lastWeek))}</h2>${recent.map(([sport, ss, gs]) => `
       <div class="section-head" style="margin-top:14px"><h3><a href="${sportHref(sport.id, 'schedule')}">${esc(sport.name)}</a></h3><span class="muted small">${gs.length} game${gs.length > 1 ? 's' : ''}${gs.length > 6 ? ', showing 6' : ''}</span></div>
       <div class="games">${gs.slice(-6).map(g => gameCard(sport, ss, g)).join('')}</div>`).join('')}</div>` : ''}

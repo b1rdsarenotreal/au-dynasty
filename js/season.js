@@ -2,12 +2,13 @@
 // schedules for every active sport), play the calendar week by week, crown
 // champions, then roll the dynasty into the next year.
 
-import { activeSports, programsIn, confOf, curYear, newYear } from './league.js?v=20261030222729';
-import { buildSchedule } from './schedule.js?v=20261030222729';
-import { postStart, LAST_WEEK } from './sports.js?v=20261030222729';
-import { play, winner, winProbability } from './game.js?v=20261030222729';
-import { selectField, buildBracket, advance, seedOf } from './postseason.js?v=20261030222729';
-import { clamp, normal, rng as makeRng, hashStr } from './util.js?v=20261030222729';
+import { activeSports, programsIn, confOf, curYear, newYear } from './league.js?v=20261030224435';
+import { buildSchedule } from './schedule.js?v=20261030224435';
+import { postStart, LAST_WEEK } from './sports.js?v=20261030224435';
+import { play, winner, winProbability } from './game.js?v=20261030224435';
+import { selectField, buildBracket, advance, seedOf } from './postseason.js?v=20261030224435';
+import { ensureChamp, drawConfTourneys, playEvent, openSelection, announce, playNational } from './champs.js?v=20261030224435';
+import { clamp, normal, rng as makeRng, hashStr } from './util.js?v=20261030224435';
 
 export const FORM_LEVELS = { none: 0, small: 0.5, normal: 1, big: 1.6 };
 const MAX_DRIFT = 8;
@@ -24,7 +25,8 @@ export function startSeason(L) {
       conf[p.school] = confOf(L, p.school, sport.id, Y.year) || '';
     }
     const games = buildSchedule(sport, Object.keys(teams), s => conf[s] || null, { seed: Y.year * 7919 });
-    Y.sports[sport.id] = { teams, conf, games, post: null, champion: null, done: false, nextId: games.length + 1, postWeek: postStart(sport) };
+    ensureChamp(sport);
+    Y.sports[sport.id] = { teams, conf, games, champion: null, done: false, nextId: games.length + 1, regEnd: sport.season[1], postWeek: sport.season[1] + 2 };
   }
   Y.phase = 'season';
   Y.week = 1;
@@ -71,7 +73,8 @@ function playRound(L, sport, ss, week, r) {
   if (post.champion) { ss.champion = post.champion; ss.done = true; }
 }
 
-// Play every game in the current week, for every sport.
+// Play every game in the current week, for every sport: regular-season
+// games, then whatever postseason step falls in this week.
 export function simWeek(L) {
   const Y = curYear(L);
   if (Y.phase !== 'season') return;
@@ -80,17 +83,39 @@ export function simWeek(L) {
   for (const [id, ss] of Object.entries(Y.sports)) {
     const sport = L.sports[id];
     if (ss.done) continue;
-    for (const g of ss.games) if (g.w === w && g.hs == null && !g.p) playGame(L, sport, ss, g, r);
-    if (!ss.post && w >= ss.postWeek) {
-      const field = selectField(ss, sport, L.settings.autoMin);
-      if (field.length < 2) { ss.done = true; continue; }
-      ss.post = buildBracket(field);
-      ss.post.startWeek = w;
-    }
-    if (ss.post && !ss.done) for (let i = 0; i < sport.post.perWeek && !ss.done; i++) playRound(L, sport, ss, w, r);
+    for (const g of ss.games) if (g.w === w && g.hs == null && !g.p && !g.ev) playGame(L, sport, ss, g, r);
+    if (ss.post) { legacyWeek(L, sport, ss, w, r); continue; } // seasons started before championship formats
+    stepPostseason(L, sport, ss, w, r);
   }
   Y.week = w + 1;
-  if (Object.values(Y.sports).every(s => s.done) || Y.week > LAST_WEEK + 4) Y.phase = 'complete';
+  if (Object.values(Y.sports).every(s => s.done) || Y.week > LAST_WEEK + 8) Y.phase = 'complete';
+}
+
+export function stepPostseason(L, sport, ss, w, r) {
+  const regEnd = ss.regEnd ?? sport.season[1];
+  const rateG = g => rate(L, sport, ss, g);
+  // Conference tournaments are drawn as soon as the regular season ends, so
+  // they can be edited before conference tournament week.
+  if (!ss.ct && w >= regEnd) drawConfTourneys(L, sport, ss, Y_of(L, ss));
+  if (w >= regEnd + 1) {
+    for (const [conf, ev] of Object.entries(ss.ct || {})) if (!ev.done) playEvent(L, sport, ss, ev, w, r, rateG, { ct: conf });
+    if (!ss.sel && Object.values(ss.ct || {}).every(ev => ev.done)) {
+      openSelection(L, sport, ss);
+      if (ss.sel.field < 2) { ss.done = true; return; }
+    }
+  }
+  if (w >= regEnd + 2 && ss.sel) {
+    if (ss.sel.status !== 'announced') announce(L, sport, ss, w);
+    playNational(L, sport, ss, w, r, rateG);
+    if (ss.natl?.champion) { ss.champion = ss.natl.champion; ss.done = true; }
+  }
+}
+
+function Y_of(L, ss) { for (const [y, Y] of Object.entries(L.years)) if (Object.values(Y.sports).includes(ss)) return Number(y); return L.currentYear; }
+
+function legacyWeek(L, sport, ss, w, r) {
+  if (!sport.post) { ss.done = true; return; }
+  if (ss.post && !ss.done) for (let i = 0; i < sport.post.perWeek && !ss.done; i++) playRound(L, sport, ss, w, r);
 }
 
 // Keep playing weeks until `stop(Y)` is true or the year is over.
@@ -102,7 +127,7 @@ export function simUntil(L, stop) {
 
 // Sports with games or championship rounds in a week.
 export function sportsInWeek(L, Y, w) {
-  return Object.entries(Y.sports).filter(([, ss]) => ss.games.some(g => g.w === w) || (!ss.done && ss.postWeek <= w && !ss.post) || (ss.post && !ss.done)).map(([id]) => id);
+  return Object.entries(Y.sports).filter(([, ss]) => ss.games.some(g => g.w === w) || (!ss.done && (ss.regEnd ?? 99) < w)).map(([id]) => id);
 }
 
 // Ratings for next year: a program keeps much of how it finished, regresses

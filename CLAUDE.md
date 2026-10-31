@@ -27,6 +27,9 @@ unless the owner asks.
 - Records that change over time carry `{ from, to }` (to = first year no
   longer in effect). Seasons snapshot their teams and conference assignments,
   so history stays correct after realignment.
+- Postseason formats are data too: national championships are stages of
+  sites (`js/formats.js`), each site an event from `js/events.js` (single,
+  double, play-in, pool). Add new formats as event kinds or stage settings.
 - Edits take effect in `effectiveYear()`: this year in the preseason,
   otherwise next year.
 

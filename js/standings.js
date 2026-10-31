@@ -1,7 +1,7 @@
 // Records, conference standings and the RPI, for one sport's season.
 // A season (`ss`) = { teams, conf: {school: confId|''}, games, post }.
 
-import { winner } from './game.js?v=20261030222729';
+import { winner } from './game.js?v=20261030224435';
 
 export const isFinal = g => g.hs != null;
 export const isPost = g => !!g.p;

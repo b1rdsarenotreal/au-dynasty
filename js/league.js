@@ -8,10 +8,11 @@
 // A record with { from, to } is in effect for from <= year < to (to = null
 // means still in effect).
 
-import { SCHOOLS } from './schools.js?v=20261030222729';
-import { SPORT_CATALOG } from './sports.js?v=20261030222729';
-import { seedFor, STARTER_SPORTS } from './seed.js?v=20261030222729';
-import { clamp } from './util.js?v=20261030222729';
+import { SCHOOLS } from './schools.js?v=20261030224435';
+import { SPORT_CATALOG } from './sports.js?v=20261030224435';
+import { seedFor, STARTER_SPORTS } from './seed.js?v=20261030224435';
+import { ensureChamp } from './champs.js?v=20261030224435';
+import { clamp } from './util.js?v=20261030224435';
 
 export const START_YEAR = 2030;
 export const yearLabel = y => `${y}–${String((y + 1) % 100).padStart(2, '0')}`;
@@ -32,6 +33,7 @@ export function newLeague() {
   for (const s of SCHOOLS) L.schools[s.id] = { ...s, joined: START_YEAR };
   for (const s of SPORT_CATALOG) L.sports[s.id] = structuredClone({ ...s, active: STARTER_SPORTS.includes(s.id), custom: false });
   L.years[START_YEAR] = newYear(START_YEAR);
+  for (const s of Object.values(L.sports)) ensureChamp(s);
   for (const id of STARTER_SPORTS) seedSport(L, id);
   return L;
 }
@@ -54,6 +56,7 @@ export function newYear(year) { return { year, phase: 'preseason', week: 0, spor
 
 export function migrateLeague(L) {
   L.settings ??= {}; L.settings.autoMin ??= 6; L.settings.form ??= 'normal';
+  for (const s of Object.values(L.sports || {})) ensureChamp(s);
   L.log ??= []; L.nextId ??= 1;
   return L;
 }

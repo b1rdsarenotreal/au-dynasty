@@ -7,7 +7,7 @@
 // `so` names the shootout winner ('home'/'away') when a tie was broken by a
 // shootout. `ot` counts overtime periods / extra innings.
 
-import { rng as makeRng, normal, clamp } from './util.js?v=20261030222729';
+import { rng as makeRng, normal, clamp } from './util.js?v=20261030224435';
 
 export const HOME_EDGE = 1.5; // rating points added to the home team
 export const ovr = t => (t.off + t.def) / 2;

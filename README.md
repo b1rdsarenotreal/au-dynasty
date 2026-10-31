@@ -24,8 +24,8 @@ Years are academic years: 2030–31 starts in late August 2030 and ends in June.
    schedule for the year.
 3. **Play week by week** (or a month, a term, or the rest of the year at once).
    Fall, winter and spring sports run on one shared calendar.
-4. **Championships.** When a sport's regular season ends, its national
-   championship field is picked and played (see below).
+4. **Postseason.** When a sport's regular season ends: conference
+   tournaments, selection, then the national championship (see below).
 5. **Start next year.** Ratings carry over, partly regressing toward each
    program's long-run level, with some random change (recruiting, graduation,
    coaching).
@@ -90,17 +90,86 @@ covers (most Division III schools, McGill and Toronto) show a monogram in
 their colors. **Edit school** takes a logo link or an uploaded image for any
 school.
 
-## Championships
+## The postseason
 
-After the regular season each sport picks its field (12 in football, 32 in
-basketball, 16 in softball by default; change it under **Rules**):
+Every sport runs the same three steps, each fully editable.
 
-- Every conference with at least 6 teams in the sport (changeable in
-  Settings) sends its regular-season champion.
-- The best remaining teams by **RPI** fill the field and everyone is seeded
-  by RPI. Independents can earn at-large bids.
-- Single elimination; baseball and softball rounds are best-of-3. Higher
-  seeds host until the sport's neutral-site rounds.
+### 1. Conference tournaments
+
+The week after the regular season. Each conference sets, per sport (on its
+page, or the sport's **Conf. tournaments** tab):
+
+- how many teams make it (none, top N, or everyone)
+- the format: **single elimination**, **double elimination** (with or
+  without an "if necessary" final game), **play-in, then double
+  elimination** (as in MCS: the low seeds play in, the top seeds wait), or
+  **pool play**
+- games per round and in the final (best of 1, 3, 5…)
+- the host: a school that **rotates** each year (never last year's host when
+  there's another choice), the **top seed**, the **higher seed** each game,
+  a **named school**, or a **neutral venue** with its name and city
+
+Tournaments are drawn from the final standings when the regular season ends.
+Until a tournament's first game you can change its format, teams, seeds and
+host for that year. The champion gets the automatic bid; with no tournament,
+the regular-season champion does. A conference needs enough teams in the
+sport for an automatic bid (6 by default, set per sport).
+
+### 2. Selection
+
+After conference tournament week, the sport's **Selection** tab opens, as in
+MCS:
+
+- **Automatic qualifiers**, with how each got the bid.
+- **At-large board** in committee order, with a line at the committee's
+  cut and **last four in** / **first four out** tags. Columns: record,
+  **RPI**, **Q1–Q4** records and **SOS**. Check and uncheck teams, then
+  **Confirm teams**. Teams below .500 only get in with an automatic bid.
+- **Seeding**: move teams with the arrows. The **Over next** column shows
+  why each team is ahead of the next one, and flags a seed you've placed
+  above a team the committee prefers. A preview shows the first-round sites
+  (and flags conference rivals at the same site). Then **Announce the
+  field**.
+- **The committee** compares teams two at a time in tiers. Tier 1: RPI, Q1
+  wins, Q4 losses. Tier 2: SOS, head-to-head, Q2 wins, W-L. Tier 3:
+  automatic bid, conference title, Q3 losses, Q1 win %, Q2 win %, Q1+Q2
+  win %. Teams start in RPI order and each moves up past every team it beats.
+- **Quadrants** use the NCAA's cut-offs scaled to the number of teams in the
+  sport.
+- Before selection opens, the tab shows **Bracketology**: the field as if
+  the season ended today.
+
+If you play past selection week without announcing, the committee's picks
+and seeds are used.
+
+### 3. The national championship
+
+Each sport's championship is a list of **stages** (Settings → Championship).
+A stage is a number of sites with a number of teams each, playing any of the
+formats above, with series lengths, an optional "if necessary" game, rounds
+on campus before neutral sites, rounds per week, and the hosting: top seed,
+higher seed, or venues (name and city, one per site, or one per round for a
+single bracket). The first stage takes the field, placed serpentine by seed;
+when each site sends on its winner, the next stage pairs sites in bracket
+order (the 1 seed's site meets the last host's), as in MCS. Pools can send
+on more than one team. The editor checks that the stages fit together.
+
+The defaults follow the real NCAA formats, scaled to the AAU:
+
+| Sport | Default championship |
+|---|---|
+| Baseball, softball | 32 teams: 8 four-team double-elimination Regionals hosted by the top 8 seeds → College World Series of two 4-team double-elimination brackets (Omaha / Devon Park) → best-of-3 Championship Series |
+| Basketball | 32 teams: first-weekend sites (women's hosted by the top seeds, men's at neutral pods) → Regionals → Final Four |
+| Football | 12-team playoff: first round on campus, then quarterfinal bowls, semifinals and the title game |
+| Soccer | 32 teams on campus down to four → College Cup |
+| Women's volleyball | 32 teams: first and second rounds at the top seeds → Regionals → Final Four |
+| Ice hockey | Men: 16 teams in four Regionals → Frozen Four. Women: campus quarterfinals → Frozen Four |
+| Lacrosse, field hockey | 16 teams → Championship Weekend / Final Four |
+| Water polo, men's volleyball | 8-team bracket at one venue |
+| Beach volleyball | 8-team double elimination at Gulf Shores |
+
+Format changes apply to this year's championship until its field is
+announced, then to next year's.
 
 ## Starting ratings
 
@@ -150,6 +219,10 @@ python3 tests/ui_test.py    # browser test (Playwright + Chromium)
 | `js/game.js` | The four game models |
 | `js/schedule.js` | Schedule builder (round robins plus non-conference fill) |
 | `js/standings.js` | Records, standings, RPI |
-| `js/postseason.js` | Championship field and bracket |
+| `js/events.js` | Tournament engine: single, double, play-in, pools |
+| `js/formats.js` | Default championship and conference tournament formats |
+| `js/selection.js` | Team sheets, quadrants, committee order |
+| `js/champs.js` | Conference tournaments, selection and national stages |
+| `js/postseason.js` | Bracket helpers (and seasons saved before championship formats) |
 | `js/season.js` | Starting, playing and rolling over a year |
 | `js/views-*.js` | Pages |

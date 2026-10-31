@@ -5,7 +5,7 @@
 // be a best-of-3 series (baseball, softball). Higher seeds host until the
 // sport's neutral-site round.
 
-import { records, rpi, rpiRanking, confStandings, confChampion } from './standings.js?v=20261030222729';
+import { records, rpi, rpiRanking, confStandings, confChampion } from './standings.js?v=20261030224435';
 
 export function selectField(ss, sport, autoMin = 6) {
   const rec = records(ss), r = rpi(ss), groups = confStandings(ss, rec, r);

@@ -1,11 +1,11 @@
 // Shared UI pieces: the league in memory, saving, school and conference
 // labels, game cards, the game detail dialog and small form helpers.
 
-import { saveLeague } from './store.js?v=20261030222729';
-import { esc } from './util.js?v=20261030222729';
-import { winner } from './game.js?v=20261030222729';
-import { weekLabel, yearLabel } from './league.js?v=20261030222729';
-import { logoFor } from './logos.js?v=20261030222729';
+import { saveLeague } from './store.js?v=20261030224435';
+import { esc } from './util.js?v=20261030224435';
+import { winner } from './game.js?v=20261030224435';
+import { weekLabel, yearLabel } from './league.js?v=20261030224435';
+import { logoFor } from './logos.js?v=20261030224435';
 
 export { esc };
 export const ctx = { league: null, render: () => {} };
@@ -86,14 +86,16 @@ export function gameCard(sport, ss, g) {
   const fin = g.hs != null, w = fin ? winner(g) : null;
   const row = (side, t, s) => `<div class="ln"><div class="t ${fin ? (w === side ? 'winner' : w ? 'loser' : '') : ''}">${school(t, { link: false })}</div><div class="s">${fin ? s : ''}</div></div>`;
   const notes = [];
-  if (g.p) notes.push(`<span class="badge gold">Championship</span>`);
+  if (g.p) notes.push(`<span class="badge gold">${esc(g.rd || 'Championship')}</span>`);
+  else if (g.ct) notes.push(`<span class="badge">${esc(L().conferences[g.ct]?.abbr || '')} Tournament${g.rd ? ` · ${esc(g.rd)}` : ''}</span>`);
   if (g.n) notes.push(`Game ${g.n}`);
   if (g.ot) notes.push(sport.model === 'innings' ? `${sport.params.innings + g.ot} inn` : g.ot > 1 ? `${g.ot}OT` : 'OT');
   if (g.so) notes.push('Shootout');
-  if (g.neu) notes.push('Neutral site');
+  if (g.site) notes.push(esc(g.site.name));
+  else if (g.neu) notes.push('Neutral site');
   return `<div class="game ${c ? 'conf' : ''} ${fin ? '' : 'pending'}" style="${c ? `--cc:${c.color}` : ''}" data-game="${g.id}" data-sport="${sport.id}">
     ${row('away', g.a, g.as)}${row('home', g.h, g.hs)}
-    <div class="meta">${c ? confBadge(g.c, { link: false }) : '<span>Non-conference</span>'}${notes.map(n => `<span>${n}</span>`).join('')}${fin ? '<span class="badge final" style="margin-left:auto">Final</span>' : ''}</div>
+    <div class="meta">${c ? confBadge(g.c, { link: false }) : g.p || g.ct ? '' : '<span>Non-conference</span>'}${notes.map(n => `<span>${n}</span>`).join('')}${fin ? '<span class="badge final" style="margin-left:auto">Final</span>' : ''}</div>
   </div>`;
 }
 
@@ -126,11 +128,11 @@ export function openGame(sportId, id) {
   const total = sport.model === 'sets' ? (sport.params.flights ? 'Pts' : 'Sets') : sport.model === 'innings' ? 'R' : 'T';
   const extra = sport.model === 'innings' && g.hits ? ['H', 'E'] : [];
   const row = (side, t, line, s, i) => `<tr><td>${school(t)}</td>${line.map(x => `<td>${x == null ? 'x' : x}</td>`).join('')}<td class="tot ${w === side ? 'winner' : ''}">${s}</td>${extra.length ? `<td>${g.hits[i]}</td><td>${g.errors[i]}</td>` : ''}</tr>`;
-  const conf = g.c ? `${confBadge(g.c)} conference game` : 'Non-conference';
-  const where = g.neu ? 'Neutral site' : `at ${esc(lg.schools[g.h]?.city || '')}${lg.schools[g.h]?.state ? `, ${esc(lg.schools[g.h].state)}` : ''}`;
+  const conf = g.c ? `${confBadge(g.c)} conference game` : g.ct ? `${confBadge(g.ct)} ${esc(lg.conferences[g.ct]?.name || '')} Tournament${g.rd ? `, ${esc(g.rd)}` : ''}` : g.p ? esc(g.rd || 'National championship') : 'Non-conference';
+  const where = g.site ? `${esc(g.site.name)}${g.site.city ? `, ${esc(g.site.city)}` : ''}` : g.neu ? 'Neutral site' : `at ${esc(lg.schools[g.h]?.city || '')}${lg.schools[g.h]?.state ? `, ${esc(lg.schools[g.h].state)}` : ''}`;
   openModal(`<div class="modal-head"><h2>${esc(lg.schools[g.a]?.short)} at ${esc(lg.schools[g.h]?.short)}</h2><button class="btn ghost" data-close>Close</button></div>
     <div class="modal-body stack">
-      <div class="muted">${esc(sport.name)} · ${weekLabel(lg.viewYear, g.w)} · ${yearLabel(lg.viewYear)} · ${where} · ${conf}${g.p ? ' · National championship' : ''}</div>
+      <div class="muted">${esc(sport.name)} · ${weekLabel(lg.viewYear, g.w)} · ${yearLabel(lg.viewYear)} · ${where} · ${conf}${g.p ? ' · National championship' : ''}${g.n ? ` · Game ${g.n}` : ''}</div>
       ${fin ? `<div class="lscore"><table><thead><tr><th></th>${labels.map(l => `<th>${l}</th>`).join('')}<th>${total}</th>${extra.map(x => `<th>${x}</th>`).join('')}</tr></thead>
         <tbody>${row('away', g.a, g.line[1], g.as, 1)}${row('home', g.h, g.line[0], g.hs, 0)}</tbody></table></div>
         ${g.so ? `<div class="hint">Tied after overtime; ${esc(lg.schools[g.so === 'home' ? g.h : g.a]?.short)} won the shootout.</div>` : ''}
