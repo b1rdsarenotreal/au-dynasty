@@ -1,77 +1,144 @@
-// Sports catalog. A sport is only settings: which game model it uses, when it
-// is played, how its schedule is built and how its championship works. New
-// sports are added in the app by copying one of these and changing it.
+// The sports AAU History knows, and how to tell which one a backup is.
 //
-// Calendar weeks count from the last Monday of August (week 1) through June.
+// Every AAU dynasty app (volleyball, softball and baseball, soccer, field
+// hockey, basketball, lacrosse, ice hockey, and any later one built on the
+// same engine) saves its backup as
+// the league itself: { name, side, seasons: { year: { teams, games, post,
+// polls, ... } }, conferences, coaches }. AAU History reads any of them.
 //
-// model:    'football' | 'periods' | 'innings' | 'sets'
-// season:   [first week, last regular-season week]; postseason follows
-// slots:    game slots per week. 1 = one game; a {series: 3} slot is a
-//           three-game series against one opponent (weekend series)
-// games:    regular-season games each team aims for
-// confGames: conference games target (round robins are trimmed or doubled)
-// wp:       spread of the win-chance curve (measured by simulation; lower
-//           means favorites win more often)
-// post:     national championship: field size, games per round (series),
-//           rounds per calendar week, and the round where sites go neutral
+// A sport profile:
+//   id      key the history is stored under (one per dynasty)
+//   name    shown on the page ("Women's Soccer")
+//   short   for narrow columns ("W Soc")
+//   gender  'women' | 'men' (the all-sports cup can show either or both)
+//   finals  the national finals' name when the backup doesn't give one
+//   ties    whether level games can stand as ties (soccer, ice hockey)
+//   pkWins  whether a shootout decides the result in the record (field
+//           hockey: yes; soccer: no, the match is a tie in the record)
+//   reg     regulation periods, when the backup doesn't say (halves,
+//           quarters, periods or innings; volleyball plays sets)
+//   unit    'match' or 'game', as the sport's app says it
+//   start   the Monday of week 1 for a season year, as the sport's app
+//           counts its calendar (seasons are academic years: the 2030
+//           season's spring sports are played in 2031)
 
-export const MODELS = {
-  football: 'Football (drives, quarters)',
-  periods: 'Timed periods (basketball, soccer, hockey, lacrosse…)',
-  innings: 'Innings (baseball, softball)',
-  sets: 'Sets (volleyball)',
+// In season order: fall, winter, spring.
+// Week-1 Mondays, from each app's calendar.
+const utc = (y, m, d) => new Date(Date.UTC(y, m, d));
+const lastWeekday = (y, m, last, dow) => last - ((utc(y, m, last).getUTCDay() - dow + 7) % 7); // the last <dow> on or before day `last`
+const firstMonday = (y, m) => 1 + ((8 - utc(y, m, 1).getUTCDay()) % 7);
+const START = {
+  fallFri: y => utc(y, 7, lastWeekday(y, 7, 31, 5) - 4), // the week of the last Friday in August
+  fallThu: y => utc(y, 7, lastWeekday(y, 7, 31, 4) - 3), // the week of the last Thursday in August (soccer)
+  janFri2: y => { const f = 1 + ((5 - utc(y + 1, 0, 1).getUTCDay() + 7) % 7) + 7; return utc(y + 1, 0, f - 4); }, // second Friday of January
+  febFri2: y => { const f = 1 + ((5 - utc(y + 1, 1, 1).getUTCDay() + 7) % 7) + 7; return utc(y + 1, 1, f - 4); }, // second Friday of February
+  octMon: y => utc(y, 9, firstMonday(y, 9)), // the first Monday in October
+  novMon: y => utc(y, 10, firstMonday(y, 10)), // the first Monday in November
+  janMon: y => { const d = utc(y + 1, 0, 26); return utc(y + 1, 0, 26 + ((8 - d.getUTCDay()) % 7)); }, // the last Monday in January
 };
 
-const P = (o) => o; // readability only
+// In season order: fall, winter, spring.
+export const SPORTS = {
+  'w-volleyball': { name: "Women's Volleyball", short: 'W VB', gender: 'women', finals: 'Final Four', unit: 'match', start: START.fallFri },
+  'm-volleyball': { name: "Men's Volleyball", short: 'M VB', gender: 'men', finals: 'National Tournament', unit: 'match', start: START.janFri2 },
+  'w-soccer': { name: "Women's Soccer", short: 'W Soc', gender: 'women', finals: 'College Cup', ties: true, reg: 2, unit: 'match', start: START.fallThu },
+  'm-soccer': { name: "Men's Soccer", short: 'M Soc', gender: 'men', finals: 'College Cup', ties: true, reg: 2, unit: 'match', start: START.fallThu },
+  'field-hockey': { name: 'Field Hockey', short: 'FH', gender: 'women', finals: 'Final Four', pkWins: true, reg: 4, unit: 'match', start: START.fallFri },
+  'w-basketball': { name: "Women's Basketball", short: 'W BB', gender: 'women', finals: 'Final Four', reg: 4, unit: 'game', start: START.novMon },
+  'm-basketball': { name: "Men's Basketball", short: 'M BB', gender: 'men', finals: 'Final Four', reg: 2, unit: 'game', start: START.novMon },
+  'w-hockey': { name: "Women's Ice Hockey", short: 'W IH', gender: 'women', finals: 'Frozen Four', ties: true, reg: 3, unit: 'game', start: START.octMon },
+  'm-hockey': { name: "Men's Ice Hockey", short: 'M IH', gender: 'men', finals: 'Frozen Four', ties: true, reg: 3, unit: 'game', start: START.octMon },
+  softball: { name: 'Softball', short: 'SB', gender: 'women', finals: "Women's College World Series", reg: 7, unit: 'game', innings: true, start: START.febFri2 },
+  baseball: { name: 'Baseball', short: 'BSB', gender: 'men', finals: 'College World Series', reg: 9, unit: 'game', innings: true, start: START.febFri2 },
+  'w-lacrosse': { name: "Women's Lacrosse", short: 'W Lax', gender: 'women', finals: 'Final Four', reg: 4, unit: 'game', start: START.janMon },
+  'm-lacrosse': { name: "Men's Lacrosse", short: 'M Lax', gender: 'men', finals: 'Final Four', reg: 4, unit: 'game', start: START.janMon },
+};
+for (const [id, p] of Object.entries(SPORTS)) p.id = id;
 
-export const SPORT_CATALOG = [
-  // ---- Fall ----
-  P({ id: 'fb', wp: 5, name: 'Football', gender: 'M', model: 'football', term: 'fall', season: [1, 13], slots: [1], games: 12, confGames: 9,
-    params: {}, post: { field: 12, series: 1, perWeek: 1, neutralFrom: 3, byes: true } }),
-  P({ id: 'msoc', wp: 11, name: "Men's Soccer", gender: 'M', model: 'periods', term: 'fall', season: [1, 11], slots: [1, 1], games: 17, confGames: 8,
-    params: { periods: 2, length: 45, avg: 1.45, k: 29, ot: 'none', otLen: 20, ties: true, label: 'H' }, post: { field: 32, series: 1, perWeek: 1, neutralFrom: 5 } }),
-  P({ id: 'wsoc', wp: 11, name: "Women's Soccer", gender: 'W', model: 'periods', term: 'fall', season: [1, 11], slots: [1, 1], games: 18, confGames: 10,
-    params: { periods: 2, length: 45, avg: 1.5, k: 29, ot: 'none', otLen: 20, ties: true, label: 'H' }, post: { field: 32, series: 1, perWeek: 1, neutralFrom: 5 } }),
-  P({ id: 'wvb', wp: 5, name: "Women's Volleyball", gender: 'W', model: 'sets', term: 'fall', season: [1, 15], slots: [1, 1], games: 28, confGames: 18,
-    params: { bestOf: 5, to: 25, last: 15 }, post: { field: 32, series: 1, perWeek: 2, neutralFrom: 5 } }),
-  P({ id: 'fh', wp: 8.7, name: 'Field Hockey', gender: 'W', model: 'periods', term: 'fall', season: [1, 11], slots: [1, 1], games: 17, confGames: 7,
-    params: { periods: 4, length: 15, avg: 2.3, k: 32, ot: 'sudden', otLen: 10, ties: false, label: 'Q' }, post: { field: 16, series: 1, perWeek: 2, neutralFrom: 3 } }),
-  P({ id: 'mwp', wp: 5.8, name: "Men's Water Polo", gender: 'M', model: 'periods', term: 'fall', season: [2, 12], slots: [1, 1], games: 24, confGames: 8,
-    params: { periods: 4, length: 8, avg: 11, k: 45, ot: 'sudden', otLen: 0, ties: false, label: 'Q' }, post: { field: 8, series: 1, perWeek: 3, neutralFrom: 1 } }),
-  // ---- Winter ----
-  P({ id: 'mbb', wp: 6, name: "Men's Basketball", gender: 'M', model: 'periods', term: 'winter', season: [11, 28], slots: [1, 1], games: 31, confGames: 20,
-    params: { periods: 2, length: 20, avg: 72, k: 100, ot: 'period', otLen: 5, ties: false, label: 'H' }, post: { field: 32, series: 1, perWeek: 2, neutralFrom: 1 } }),
-  P({ id: 'wbb', wp: 6.3, name: "Women's Basketball", gender: 'W', model: 'periods', term: 'winter', season: [11, 28], slots: [1, 1], games: 30, confGames: 18,
-    params: { periods: 4, length: 10, avg: 68, k: 100, ot: 'period', otLen: 5, ties: false, label: 'Q' }, post: { field: 32, series: 1, perWeek: 2, neutralFrom: 3 } }),
-  P({ id: 'mih', wp: 8.7, name: "Men's Ice Hockey", gender: 'M', model: 'periods', term: 'winter', season: [7, 29], slots: [{ series: 2 }], games: 34, confGames: 24,
-    params: { periods: 3, length: 20, avg: 3.0, k: 35, ot: 'sudden', otLen: 5, ties: true, label: 'P' }, post: { field: 16, series: 1, perWeek: 2, neutralFrom: 1 } }),
-  P({ id: 'wih', wp: 8.7, name: "Women's Ice Hockey", gender: 'W', model: 'periods', term: 'winter', season: [7, 29], slots: [{ series: 2 }], games: 34, confGames: 24,
-    params: { periods: 3, length: 20, avg: 2.9, k: 35, ot: 'sudden', otLen: 5, ties: true, label: 'P' }, post: { field: 11, series: 1, perWeek: 2, neutralFrom: 3 } }),
-  // ---- Spring ----
-  P({ id: 'base', wp: 8, name: 'Baseball', gender: 'M', model: 'innings', term: 'spring', season: [25, 38], slots: [1, { series: 3 }], games: 56, confGames: 30,
-    params: { innings: 9, mercy: [10, 7], tiebreak: false, avgRuns: 6.2 }, post: { field: 16, series: 3, perWeek: 1, neutralFrom: 3 } }),
-  P({ id: 'sb', wp: 9.6, name: 'Softball', gender: 'W', model: 'innings', term: 'spring', season: [25, 38], slots: [1, { series: 3 }], games: 56, confGames: 24,
-    params: { innings: 7, mercy: [8, 5], tiebreak: true, avgRuns: 6.4 }, post: { field: 16, series: 3, perWeek: 1, neutralFrom: 3 } }),
-  P({ id: 'mlax', wp: 5.5, name: "Men's Lacrosse", gender: 'M', model: 'periods', term: 'spring', season: [24, 36], slots: [1], games: 14, confGames: 6,
-    params: { periods: 4, length: 15, avg: 11.5, k: 45, ot: 'sudden', otLen: 0, ties: false, label: 'Q' }, post: { field: 16, series: 1, perWeek: 2, neutralFrom: 3 } }),
-  P({ id: 'wlax', wp: 5.5, name: "Women's Lacrosse", gender: 'W', model: 'periods', term: 'spring', season: [24, 36], slots: [1, 1], games: 17, confGames: 8,
-    params: { periods: 4, length: 15, avg: 12.5, k: 45, ot: 'sudden', otLen: 0, ties: false, label: 'Q' }, post: { field: 16, series: 1, perWeek: 2, neutralFrom: 3 } }),
-  P({ id: 'mvb', wp: 5.2, name: "Men's Volleyball", gender: 'M', model: 'sets', term: 'spring', season: [20, 34], slots: [{ series: 2 }], games: 26, confGames: 14,
-    params: { bestOf: 5, to: 25, last: 15 }, post: { field: 8, series: 1, perWeek: 3, neutralFrom: 1 } }),
-  P({ id: 'wwp', wp: 5.8, name: "Women's Water Polo", gender: 'W', model: 'periods', term: 'spring', season: [23, 35], slots: [1, 1], games: 24, confGames: 8,
-    params: { periods: 4, length: 8, avg: 10, k: 45, ot: 'sudden', otLen: 0, ties: false, label: 'Q' }, post: { field: 8, series: 1, perWeek: 3, neutralFrom: 1 } }),
-  P({ id: 'bvb', wp: 4, name: 'Beach Volleyball', gender: 'W', model: 'sets', term: 'spring', season: [26, 36], slots: [1, 1, 1], games: 26, confGames: 8,
-    params: { bestOf: 3, to: 21, last: 15, flights: 5 }, post: { field: 8, series: 1, perWeek: 3, neutralFrom: 1 } }),
-];
+// A sport the history hasn't seen before: named by the commissioner on upload.
+export function customSport(name, gender) {
+  const id = `x-${gender}-${String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+  return { id, name, short: name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 4), gender, finals: 'National Championship', custom: true };
+}
 
-export const TERMS = { fall: 'Fall', winter: 'Winter', spring: 'Spring' };
-export const GENDER = { M: "Men's", W: "Women's", X: 'Coed' };
+// What the regular-season line scores look like: the usual number of periods,
+// the largest score in a period, how often R is the sum of the line (every
+// sport but volleyball, whose R is sets won) and the average score per team.
+// Volleyball has 3–5 sets of up to 25+ points; softball 7 innings, baseball
+// 9; soccer 2 halves; ice hockey 3 periods; basketball 2 halves or 4
+// quarters of many points; field hockey and lacrosse 4 quarters (lacrosse
+// about 11 goals a team, field hockey about 2–3).
+function lineShape(league) {
+  const lens = [], tops = [];
+  let summed = 0, points = 0;
+  for (const s of Object.values(league.seasons || {})) {
+    for (const g of s.games || []) {
+      if (g.type !== 'regular' || !g.final || !Array.isArray(g.homeLine) || !g.homeLine.length) continue;
+      const line = g.homeLine.map(Number).filter(Number.isFinite);
+      lens.push(g.homeLine.length);
+      tops.push(Math.max(...line, ...(g.awayLine || []).map(Number).filter(Number.isFinite)));
+      const sum = line.reduce((a, b) => a + b, 0);
+      if (Number(g.homeR) === sum) summed++;
+      points += (Number(g.homeR) || 0) + (Number(g.awayR) || 0);
+      if (lens.length > 400) break;
+    }
+  }
+  if (!lens.length) return null;
+  const mode = arr => { const c = {}; for (const x of arr) c[x] = (c[x] || 0) + 1; return +Object.entries(c).sort((a, b) => b[1] - a[1])[0][0]; };
+  const sums = summed / lens.length > 0.5;
+  return { len: mode(lens), top: Math.max(...tops), sums, avg: sums ? points / lens.length / 2 : 0 };
+}
 
-// Games one slot holds.
-export const slotGames = s => (typeof s === 'object' ? s.series : s);
+// The one sport a name or file name mentions ('basketball', 'field-hockey',
+// …), or null when it names none or several ("softball-baseball").
+export function sportWord(text) {
+  const t = String(text || '').toLowerCase().replace(/[^a-z]+/g, ' ');
+  const found = [
+    ['volleyball', /volleyball/], ['basketball', /basketball/], ['lacrosse', /lacrosse/],
+    ['field-hockey', /field hockey|fhockey/], ['hockey', /(^|[^d] )hockey|^hockey/], ['soccer', /soccer/],
+    ['softball', /softball/], ['baseball', /baseball/],
+  ].filter(([, re]) => re.test(t)).map(([w]) => w);
+  return found.length === 1 ? found[0] : null;
+}
+export const sportFamily = sport => sport.custom ? null : sport.id.replace(/^[wm]-/, '');
 
-// Total calendar weeks in the regular season and the week the championship
-// starts (the week after the regular season, plus a week off for football).
-export function postStart(sport) { return sport.season[1] + (sport.model === 'football' ? 2 : 1); }
+// Which sport a backup is: { sport, sure }. `sure` is false when it had to
+// guess; the upload screen lets the commissioner pick another.
+export function detectSport(league) {
+  const name = String(league?.name || '').toLowerCase();
+  const side = league?.side;
+  const men = side === 'men' || /\bmen'?s\b/.test(name) && !/women/.test(name);
+  if (side === 'softball') return { sport: SPORTS.softball, sure: true };
+  if (side === 'baseball') return { sport: SPORTS.baseball, sure: true };
+  // Newer apps say which sport they are.
+  const tagged = { basketball: 'basketball', lacrosse: 'lacrosse', hockey: 'hockey' }[league?.sport];
+  if (tagged) return { sport: SPORTS[`${men ? 'm' : 'w'}-${tagged}`], sure: true };
+  const shape = lineShape(league);
+  const pick = fam => SPORTS[fam] || SPORTS[`${men ? 'm' : 'w'}-${fam}`];
+  if (shape) {
+    if (!shape.sums && shape.top >= 15 && shape.len >= 3 && shape.len <= 5) return { sport: pick('volleyball'), sure: true };
+    if (shape.sums && shape.avg >= 35 && (shape.len === 2 || shape.len === 4)) return { sport: pick('basketball'), sure: true };
+    if (shape.len === 7) return { sport: SPORTS.softball, sure: true };
+    if (shape.len === 9) return { sport: SPORTS.baseball, sure: true };
+    if (shape.len === 3 && shape.top < 10) return { sport: pick('hockey'), sure: true };
+    if (shape.len === 2 && shape.top < 10) return { sport: pick('soccer'), sure: true };
+    if (shape.len === 4 && shape.avg >= 7) return { sport: pick('lacrosse'), sure: true };
+    if (shape.len === 4 && shape.top < 10) return { sport: SPORTS['field-hockey'], sure: true };
+  }
+  // No results yet (or a new sport): go by the name.
+  if (/volleyball/.test(name)) return { sport: SPORTS[men ? 'm-volleyball' : 'w-volleyball'], sure: true };
+  if (/soccer/.test(name)) return { sport: SPORTS[men ? 'm-soccer' : 'w-soccer'], sure: true };
+  if (/field hockey|fhockey/.test(name)) return { sport: SPORTS['field-hockey'], sure: true };
+  if (/basketball/.test(name)) return { sport: SPORTS[men ? 'm-basketball' : 'w-basketball'], sure: true };
+  if (/lacrosse/.test(name)) return { sport: SPORTS[men ? 'm-lacrosse' : 'w-lacrosse'], sure: true };
+  if (/hockey/.test(name)) return { sport: SPORTS[men ? 'm-hockey' : 'w-hockey'], sure: true };
+  if (/softball/.test(name)) return { sport: SPORTS.softball, sure: true };
+  if (/baseball/.test(name)) return { sport: SPORTS.baseball, sure: true };
+  const guess = String(league?.name || 'New sport').replace(/^AAU\s+/i, '').replace(/^(wo)?men'?s\s+/i, '').trim() || 'New sport';
+  return { sport: customSport(guess, men ? 'men' : 'women'), sure: false };
+}
 
-export const LAST_WEEK = 46; // mid-June
+// Is this file a dynasty backup at all?
+export function isDynastyBackup(data) {
+  return !!(data && typeof data === 'object' && data.seasons && typeof data.seasons === 'object' && Object.values(data.seasons).some(s => s && s.teams && Array.isArray(s.games)));
+}

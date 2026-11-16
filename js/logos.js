@@ -1,45 +1,18 @@
-// School logos, found the same way as in MCS Dynasty plus one more source:
-//
-// 1. A logo the commissioner set for the school (Edit school).
-// 2. The college football logo list MCS uses
-//    (https://gist.github.com/saiemgilani/c6596f0e1c8b148daabc2b7f1e6f6add,
-//    ESPN logo URLs keyed by school name and alternate names).
-// 3. ESPN's women's college basketball team list, which covers every
-//    Division I school, including the ones without football.
-//
-// Both lists are fetched by the browser once and cached for 30 days. Schools
-// neither list covers (most Division III and Canadian schools) show a
-// monogram in their colors until a logo is set.
+// Team logos. Primary source: the college football logo list at
+// https://gist.github.com/saiemgilani/c6596f0e1c8b148daabc2b7f1e6f6add
+// (ESPN logo URLs keyed by school and alternate names). It's fetched once and
+// cached in this browser. Teams it doesn't cover show their initials until
+// the commissioner adds a logo.
 
 const GIST_RAW = 'https://gist.githubusercontent.com/saiemgilani/c6596f0e1c8b148daabc2b7f1e6f6add/raw/logos';
-const ESPN_TEAMS = 'https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-basketball/teams?limit=1000';
-const CACHE_KEY = 'au-logo-tables-v1';
+const CACHE_KEY = 'aau-history-logo-table-v1';
+// Schools without football (UC San Diego, UC Irvine, George Washington…)
+// come from ESPN's women's college soccer team list instead.
+const ESPN_TEAMS = 'https://site.api.espn.com/apis/site/v2/sports/soccer/usa.ncaa.w.1/teams?limit=1000';
 const MAX_AGE = 30 * 24 * 3600 * 1000;
 
-// Other names the lists may use for a school.
-export const LOGO_ALIASES = {
-  miami: ['Miami', 'Miami (FL)', 'Miami Hurricanes'],
-  penn: ['Pennsylvania', 'Penn'],
-  usc: ['USC', 'Southern California'],
-  pitt: ['Pittsburgh', 'Pitt'],
-  cal: ['California', 'Cal'],
-  usf: ['South Florida', 'USF'],
-  unc: ['North Carolina', 'UNC'],
-  washu: ['Washington-St. Louis', 'Washington (MO)', 'Washington University', 'WashU'],
-  case: ['Case Western', 'Case Western Reserve'],
-  chicago: ['Chicago', 'University of Chicago'],
-  nyu: ['NYU', 'New York University'],
-  cmu: ['Carnegie Mellon'],
-  mit: ['MIT', 'Massachusetts Institute of Technology'],
-  caltech: ['Caltech', 'California Institute of Technology'],
-  bu: ['Boston University'],
-  gwu: ['George Washington'],
-  stonybrook: ['Stony Brook'],
-  ohiostate: ['Ohio State'],
-  notredame: ['Notre Dame'],
-};
+let table = null; // lowercased name -> { light, dark, color, altColor }
 
-let tables = null; // { gist: {name: url}, espn: {name: url} }
 const https = u => (u ? String(u).replace(/^http:\/\//i, 'https://') : null);
 const norm = s => String(s || '').trim().toLowerCase();
 
@@ -65,86 +38,57 @@ export function parseCSV(text) {
   return rows;
 }
 
-export function gistTable(csvText) {
+export function buildTable(csvText) {
   const [header, ...rows] = parseCSV(csvText);
   const col = name => header.findIndex(h => h.trim().toLowerCase() === name);
-  const iSchool = col('school'), iLogo = col('logo');
-  const alt = ['alt_name1', 'alt_name2', 'alt_name3'].map(col).filter(i => i >= 0);
+  const iSchool = col('school'), iLogo = col('logo'), iDark = col('logos[1]'), iColor = col('color'), iAlt = col('alt_color');
+  const altCols = ['alt_name1', 'alt_name2', 'alt_name3', 'abbreviation'].map(col).filter(i => i >= 0);
   const out = {};
   for (const r of rows) {
-    const url = https(r[iLogo]);
-    if (!url) continue;
-    const k = norm(r[iSchool]);
-    if (k) out[k] = url;
-    for (const i of alt) { const a = norm(r[i]); if (a && !(a in out)) out[a] = url; }
+    const entry = { light: https(r[iLogo]), dark: https(r[iDark]) || https(r[iLogo]), color: r[iColor] || null, altColor: r[iAlt] || null };
+    if (!entry.light) continue;
+    const school = norm(r[iSchool]);
+    if (school) out[school] = entry;
+    for (const i of altCols) { const k = norm(r[i]); if (k && !(k in out)) out[k] = entry; }
   }
   return out;
 }
 
-export function espnTable(json) {
-  const out = {};
+// Adds ESPN's team list to the table: "Michigan Wolverines" and "Michigan".
+export function addEspn(out, json) {
   const teams = json?.sports?.[0]?.leagues?.[0]?.teams || [];
   for (const { team: t } of teams) {
     const url = https(t?.logos?.[0]?.href);
     if (!url) continue;
-    out[norm(t.displayName)] = url; // "Michigan Wolverines": exact, so checked first
-    const loc = norm(t.location);
-    if (loc && !(loc in out)) out[loc] = url;
+    const entry = { light: url, dark: https(t.logos?.[1]?.href) || url, color: t.color ? `#${t.color}` : null, altColor: t.alternateColor ? `#${t.alternateColor}` : null };
+    for (const k of [t.displayName, t.location, t.shortDisplayName].map(norm)) if (k && !(k in out)) out[k] = entry;
   }
   return out;
 }
 
-async function fetchTables() {
-  const [g, e] = await Promise.allSettled([
-    fetch(GIST_RAW).then(r => (r.ok ? r.text() : Promise.reject(r.status))).then(gistTable),
-    fetch(ESPN_TEAMS).then(r => (r.ok ? r.json() : Promise.reject(r.status))).then(espnTable),
-  ]);
-  return { gist: g.status === 'fulfilled' ? g.value : {}, espn: e.status === 'fulfilled' ? e.value : {} };
-}
-
-export async function loadLogos({ force = false } = {}) {
-  if (tables && !force) return tables;
+export async function loadLogoTable({ force = false } = {}) {
+  if (table && !force) return table;
   try {
-    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-    if (c && !force && Date.now() - c.at < MAX_AGE && (Object.keys(c.tables.gist).length || Object.keys(c.tables.espn).length)) return (tables = c.tables);
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (cached && !force && Date.now() - cached.at < MAX_AGE) return (table = cached.table);
   } catch { /* ignore */ }
-  tables = await fetchTables().catch(() => ({ gist: {}, espn: {} }));
-  if (Object.keys(tables.gist).length || Object.keys(tables.espn).length) {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), tables })); } catch { /* quota */ }
-  }
-  return tables;
+  const [gist, espn] = await Promise.allSettled([
+    fetch(GIST_RAW).then(r => (r.ok ? r.text() : Promise.reject(r.status))),
+    fetch(ESPN_TEAMS).then(r => (r.ok ? r.json() : Promise.reject(r.status))),
+  ]);
+  const next = gist.status === 'fulfilled' ? buildTable(gist.value) : {};
+  if (espn.status === 'fulfilled') addEspn(next, espn.value);
+  if (Object.keys(next).length) {
+    table = next;
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), table })); } catch { /* quota */ }
+  } else table = table || {};
+  return table;
 }
 
-// For tests: use given tables instead of fetching.
-export function setTables(t) { tables = t; }
-
-// Logo URL for a school, or null.
-export function logoFor(s) {
-  if (!s) return null;
-  if (s.logo) return https(s.logo);
-  if (!tables) return null;
-  const names = [...(LOGO_ALIASES[s.id] || []), s.short, s.name].map(norm);
-  for (const n of names) if (tables.gist[n]) return tables.gist[n];
-  const full = norm(`${s.short} ${s.mascot}`);
-  if (tables.espn[full]) return tables.espn[full];
-  for (const n of names) if (tables.espn[n]) return tables.espn[n];
-  return null;
-}
-
-// Shrink an image file to at most `max` pixels and return it as a data URL,
-// so an uploaded logo stays small inside the save.
-export function imageFileToDataUrl(file, max = 160) {
-  return new Promise((resolve, reject) => {
-    const img = new Image(), url = URL.createObjectURL(file);
-    img.onload = () => {
-      const k = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/png'));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file isn\'t an image this browser can read.')); };
-    img.src = url;
-  });
+// Returns a logo URL or null: the commissioner's own logo first, then the list.
+export function logoFor(team, aliases = {}) {
+  if (!team) return null;
+  if (team.logoOverride) return https(team.logoOverride);
+  const hit = table?.[norm(team.school)] || table?.[norm(aliases[team.school])];
+  return hit ? hit.light : null;
 }

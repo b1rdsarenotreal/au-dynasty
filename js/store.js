@@ -1,49 +1,113 @@
-// Persistence: the league lives in this browser's IndexedDB (falls back to
-// localStorage). Export/import JSON for backups or moving devices.
+// The combined history lives in this browser (IndexedDB, with a localStorage
+// fallback): { dynasties: { sportId: extract }, updated }. Uploading a
+// backup again replaces that sport's seasons with the new ones and keeps any
+// older seasons the new file no longer has. Download/Restore move it.
 
-const DB = 'au-dynasty', STORE = 'kv', KEY = 'league';
+import { SPORTS, sportWord, sportFamily } from './sports.js?v=20261115173051';
+// Its own database: AAU History (the older record book, on the same site)
+// keeps 'aau-history', which the hub copies once on its first visit.
+const DB = 'aau-dynasty', STORE = 'kv', KEY = 'aau-dynasty';
+const OLD_DB = 'aau-history', OLD_KEY = 'aau-history';
 
-function idb() {
+function idb(name = DB) {
   return new Promise((resolve, reject) => {
     if (!('indexedDB' in globalThis)) return reject(new Error('no indexedDB'));
-    const req = indexedDB.open(DB, 1);
+    const req = indexedDB.open(name, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-async function tx(mode, fn) {
-  const db = await idb();
-  return new Promise((resolve, reject) => {
-    const t = db.transaction(STORE, mode);
-    const req = fn(t.objectStore(STORE));
-    t.oncomplete = () => resolve(req?.result);
-    t.onerror = () => reject(t.error);
-  });
+export const emptyHistory = () => ({ dynasties: {}, updated: null });
+
+export async function loadHistory() {
+  try {
+    const db = await idb();
+    const v = await new Promise((resolve, reject) => {
+      const r = db.transaction(STORE).objectStore(STORE).get(KEY);
+      r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+    });
+    if (v) return hydrate(v);
+  } catch { /* fall through */ }
+  // First visit: start from AAU History's uploads, if this browser has them.
+  try {
+    const names = indexedDB.databases ? new Set((await indexedDB.databases()).map(d => d.name)) : null;
+    if (names?.has(OLD_DB)) {
+      const db = await idb(OLD_DB);
+      const v = await new Promise(resolve => { try { const r = db.transaction(STORE).objectStore(STORE).get(OLD_KEY); r.onsuccess = () => resolve(r.result); r.onerror = () => resolve(null); } catch { resolve(null); } });
+      db.close();
+      if (v?.dynasties) return hydrate(v);
+    }
+  } catch { /* fall through */ }
+  try { return hydrate(JSON.parse(localStorage.getItem(KEY) || 'null') || emptyHistory()); } catch { return emptyHistory(); }
 }
 
-export async function loadLeague() {
-  try { return (await tx('readonly', s => s.get(KEY))) || null; }
-  catch { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } }
+// Saved sports are plain data (a sport's calendar rule is a function, which
+// can't be saved): give each known sport its profile back on load.
+export function hydrateHistory(h) { return hydrate(h); }
+function hydrate(h) {
+  for (const d of Object.values(h?.dynasties || {})) if (d?.sport && SPORTS[d.sport.id]) d.sport = { ...d.sport, ...SPORTS[d.sport.id] };
+  return h;
 }
 
-export async function saveLeague(league) {
-  league.savedAt = new Date().toISOString();
-  try { await tx('readwrite', s => s.put(JSON.parse(JSON.stringify(league)), KEY)); }
-  catch { localStorage.setItem(KEY, JSON.stringify(league)); }
+// Saves the history; returns false if neither IndexedDB nor localStorage
+// took it. IndexedDB gets plain data: the sports' calendar functions made
+// every save there fail (a DataCloneError) and fall back to localStorage,
+// which is too small for schedules and brackets, so a reload brought back
+// an older history.
+export async function saveHistory(h) {
+  h.updated = new Date().toISOString();
+  const plain = JSON.parse(JSON.stringify(h));
+  try {
+    const db = await idb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(plain, KEY);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+    });
+    try { localStorage.removeItem(KEY); } catch { /* fine */ } // the old fallback copy, now stale
+    return true;
+  } catch (e) { console.warn('IndexedDB save failed', e); }
+  try { localStorage.setItem(KEY, JSON.stringify(plain)); return true; } catch (e) { console.warn('localStorage save failed', e); return false; }
 }
 
-export async function clearLeague() {
-  try { await tx('readwrite', s => s.delete(KEY)); } catch { /* ignore */ }
-  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+// Add (or refresh) one dynasty's history. Seasons in the new extract win;
+// seasons only in the old one are kept. Returns { added, updated, kept }.
+export function mergeDynasty(h, ext, meta = {}) {
+  const id = ext.sport.id, old = h.dynasties[id];
+  const years = { ...(old?.years || {}) };
+  let added = 0, updated = 0;
+  for (const [y, s] of Object.entries(ext.years)) { years[y] ? updated++ : added++; years[y] = s; }
+  const kept = old ? Object.keys(old.years).filter(y => !(y in ext.years)).length : 0;
+  h.dynasties[id] = {
+    ...ext, years, upcoming: undefined,
+    schools: { ...(old?.schools || {}), ...ext.schools },
+    conferences: { ...(old?.conferences || {}), ...ext.conferences },
+    uploadedAt: new Date().toISOString(), fileName: meta.fileName || old?.fileName || '',
+  };
+  return { added, updated, kept };
 }
 
-export function exportLeague(league) {
-  const blob = new Blob([JSON.stringify(league, null, 1)], { type: 'application/json' });
+// A backup filed under the wrong sport (an older AAU History took
+// untagged women's basketball for volleyball): an entry whose file name names
+// another sport is removed, so both backups can be uploaded again. Returns
+// what was removed.
+export function repairHistory(h) {
+  const removed = [];
+  for (const [id, d] of Object.entries(h?.dynasties || {})) {
+    const fam = sportFamily(d.sport), named = sportWord(d.fileName);
+    if (fam && named && named !== fam) { removed.push({ name: d.sport.name, fileName: d.fileName }); delete h.dynasties[id]; }
+  }
+  return removed;
+}
+
+export function exportHistory(h) {
+  const blob = new Blob([JSON.stringify(h)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${(league.name || 'dynasty').replace(/\W+/g, '-')}-${league.currentYear}.json`;
+  a.download = `AAU-Dynasty-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+export const isHistoryBackup = d => !!(d && d.dynasties && typeof d.dynasties === 'object' && !d.seasons);

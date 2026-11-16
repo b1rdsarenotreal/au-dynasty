@@ -1,147 +1,92 @@
-// Shared UI pieces: the league in memory, saving, school and conference
-// labels, game cards, the game detail dialog and small form helpers.
+// Shared page pieces: the history, logos, school labels, sport labels.
 
-import { saveLeague } from './store.js?v=20261030224435';
-import { esc } from './util.js?v=20261030224435';
-import { winner } from './game.js?v=20261030224435';
-import { weekLabel, yearLabel } from './league.js?v=20261030224435';
-import { logoFor } from './logos.js?v=20261030224435';
+import { logoFor } from './logos.js?v=20261115173051';
+import { SPORTS } from './sports.js?v=20261115173051';
 
-export { esc };
-export const ctx = { league: null, render: () => {} };
+// Logo files in this app (img/conf/) carry this release's version, like the
+// scripts do, so a redrawn logo shows right away instead of a cached copy.
+const RELEASE = (() => { try { return new URL(import.meta.url).searchParams.get('v') || ''; } catch { return ''; } })();
+export const assetUrl = u => (RELEASE && /^img\//.test(u || '') ? `${u}${u.includes('?') ? '&' : '?'}v=${RELEASE}` : u);
+
+// Seasons are academic years: the 2030 season is "2030–31". Years stay
+// numbers in the data; this is only how they read on screen.
+export const seasonLabel = y => (Number.isFinite(+y) && y !== '' && y != null ? `${y}–${String((+y + 1) % 100).padStart(2, '0')}` : String(y ?? ''));
+// A span of seasons: "2030–31" for one, "2030–35" for 2030–31 through 2034–35.
+export const seasonSpan = (a, b) => (a === b ? seasonLabel(a) : `${a}–${String((+b + 1) % 100).padStart(2, '0')}`);
+
+export const ctx = { history: null, render: () => {}, live: [], upcoming: {} };
 export const app = document.getElementById('app');
 export const modal = document.getElementById('modal');
 export const $ = (sel, root = app) => root.querySelector(sel);
 export const $$ = (sel, root = app) => [...root.querySelectorAll(sel)];
-export const L = () => ctx.league;
-export const VY = () => ctx.league.years[ctx.league.viewYear];
-
-let saveTimer;
-export function persist() { clearTimeout(saveTimer); saveTimer = setTimeout(() => saveLeague(ctx.league), 200); }
-export function flushSave() { clearTimeout(saveTimer); return saveLeague(ctx.league); }
-export function changed() { persist(); ctx.render(); }
+export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function toast(msg, error = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'toast show' + (error ? ' error' : '');
-  clearTimeout(t._t); t._t = setTimeout(() => (t.className = 'toast'), error ? 5000 : 2600);
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast show${error ? ' error' : ''}`;
+  clearTimeout(toast.t); toast.t = setTimeout(() => (el.className = 'toast'), 3200);
 }
 
-// Text color that reads on a background color.
-export function readableOn(hex) {
-  const h = (hex || '#333333').replace('#', '');
-  const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
-  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 0.6 ? '#111111' : '#ffffff';
+// Dynasties in a steady order: women's sports, then men's, by name.
+export function dynasties() {
+  const order = Object.keys(SPORTS);
+  return Object.values(ctx.history?.dynasties || {}).sort((a, b) => {
+    const ia = order.indexOf(a.sport.id), ib = order.indexOf(b.sport.id);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.sport.name.localeCompare(b.sport.name);
+  });
 }
 
-// Badge letters: up to 4 on big badges; small ones get 1-2 letters so they
-// stay readable (Duke → D, Michigan State → MS).
-function initials(s, size) {
-  const short = s.short || s.name || '?';
-  const words = short.replace(/&/g, ' ').replace(/[^A-Za-z ]/g, ' ').split(/\s+/).filter(Boolean);
-  if (s.abbr) return size < 30 ? s.abbr.slice(0, 3) : s.abbr;
-  if (size >= 30) return short.length <= 4 ? short.toUpperCase() : words.length > 1 ? words.slice(0, 3).map(w => w[0]).join('').toUpperCase() : short.slice(0, 3).toUpperCase();
-  if (short.length <= 3 && short === short.toUpperCase()) return short;
-  return words.length > 1 ? words.slice(0, 2).map(w => w[0]).join('').toUpperCase() : words[0][0].toUpperCase();
+// The look of a school (colors, abbreviation, logo) from whichever dynasty
+// saw it most recently.
+export function schoolLook(name) {
+  let best = null;
+  for (const d of dynasties()) if (d.schools?.[name]) best = { ...best, ...d.schools[name], logo: d.schools[name].logo || best?.logo || null };
+  // A school only in a season that hasn't started (the calendar).
+  if (!best) for (const u of Object.values(ctx.upcoming || {})) if (u.schools?.[name]) best = { ...u.schools[name] };
+  return best || { school: name };
+}
+export function allSchools() {
+  const set = new Set();
+  for (const d of dynasties()) for (const s of Object.values(d.years)) for (const t of Object.keys(s.teams)) set.add(t);
+  return [...set].sort((a, b) => a.localeCompare(b));
 }
 
-// A square monogram in the school's colors.
-export function badge(id, size = 20) {
-  const s = L().schools[id] || { short: id, colors: ['#555555', '#999999'] };
-  const [c1, c2] = s.colors;
-  const txt = initials(s, size);
-  const fs = Math.round(size * (txt.length > 3 ? 0.34 : txt.length > 2 ? 0.4 : txt.length > 1 ? 0.5 : 0.62));
-  const mono = `<span class="tbadge" style="--tc:${c1};--ta:${c2};--tt:${readableOn(c1)};width:${size}px;height:${size}px;font-size:${fs}px">${esc(txt)}</span>`;
-  const url = logoFor(s);
-  if (!url) return mono;
-  // If the image fails to load, the monogram takes its place.
-  return `<span class="logo" style="width:${size}px;height:${size}px" data-fb="${esc(mono)}"><img src="${esc(url)}" alt="" width="${size}" height="${size}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.outerHTML=this.parentNode.dataset.fb"></span>`;
+export function readableOn(bg) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(bg || '');
+  if (!m) return '#fff';
+  const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? '#111' : '#fff';
 }
+const initials = name => String(name).replace(/[^A-Za-z0-9 &-]/g, '').split(/[\s&-]+/).filter(Boolean).map(w => w[0]).join('').slice(0, 3).toUpperCase();
 
-export const schoolHref = id => `#/school/${encodeURIComponent(id)}`;
-export const sportHref = (id, tab = '') => `#/sport/${id}${tab ? `/${tab}` : ''}`;
-export const confHref = id => `#/conference/${encodeURIComponent(id)}`;
-
-export function school(id, { link = true, size = 18, seed = null, rec = '' } = {}) {
-  const s = L().schools[id];
-  const name = esc(s?.short || id);
-  const label = link ? `<a class="team-link" href="${schoolHref(id)}">${name}</a>` : name;
-  return `<span class="team">${seed ? `<span class="rank">${seed}</span>` : ''}${badge(id, size)}${label}${rec ? ` <span class="muted small">${esc(rec)}</span>` : ''}</span>`;
+export function logoImg(name, size = 20) {
+  const t = schoolLook(name);
+  const url = logoFor({ school: name, logoOverride: t.logo }, { Penn: 'Pennsylvania' });
+  const badge = `<span class="tbadge" style="width:${size}px;height:${size}px;font-size:${Math.max(7, size * 0.38)}px;background:${esc(t.color || '#666')};color:${esc(readableOn(t.color))}">${esc(t.abbr || initials(name))}</span>`;
+  if (!url) return badge;
+  return `<span class="logo" data-fb="${esc(badge)}" style="width:${size}px;height:${size}px"><img src="${esc(url)}" alt="" width="${size}" height="${size}" loading="lazy" onerror="this.parentNode.outerHTML=this.parentNode.dataset.fb"></span>`;
 }
+export const schoolHref = name => `#/school/${encodeURIComponent(name)}`;
+export const school = (name, size = 18) => (name ? `<span class="team">${logoImg(name, size)}<a class="team-link" href="${schoolHref(name)}">${esc(name)}</a></span>` : '<span class="muted">—</span>');
 
-export function confBadge(id, { link = true } = {}) {
-  if (!id) return '<span class="cbadge ind">IND</span>';
-  const c = L().conferences[id];
-  if (!c) return '<span class="cbadge ind">?</span>';
-  const b = `<span class="cbadge" style="--cc:${c.color}" title="${esc(c.name)}">${esc(c.abbr)}</span>`;
-  return link ? `<a href="${confHref(id)}" style="text-decoration:none">${b}</a>` : b;
+// Conference logos the owner later swapped from drawn ones to links (the same
+// list as the dynasty apps' CONF_LOGO_LINKS): older backups still name the
+// drawn file.
+const CONF_LOGO_LINKS = {
+  bigten: 'https://content.sportslogos.net/logos/153/4661/full/big_ten_conference_logo_primary_20115933.png',
+  ivy: 'https://content.sportslogos.net/logos/153/4824/full/ivy_league_logo_primary_2019_sportslogosnet-9024.png',
+  metro: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/METRO_Primary_LtBG.png/500px-METRO_Primary_LtBG.png',
+  pac10: 'https://content.sportslogos.net/logos/153/4945/full/pacific-10_conference_logo_wordmark_1995_sportslogosnet-1134.png',
+  uaa: 'https://dbukjj6eu5tsf.cloudfront.net/uaasports.info/images/responsive_2023/logo-main.svg',
+};
+const confLogoUrl = url => { const m = /^img\/conf\/(\w+)\.svg$/.exec(url || ''); return (m && CONF_LOGO_LINKS[m[1]]) || url; };
+
+export function confLogo(d, c, size = 18) {
+  const info = d?.conferences?.[c] || {};
+  const badge = `<span class="tbadge" style="width:${size}px;height:${size}px;font-size:${size * 0.34}px;background:${esc(info.color || '#555')};color:#fff">${esc((info.abbr || c).slice(0, 4))}</span>`;
+  if (info.logo) return `<img src="${esc(assetUrl(confLogoUrl(info.logo)))}" alt="" width="${size}" height="${size}" style="vertical-align:middle;object-fit:contain" data-fb="${esc(badge)}" onerror="this.outerHTML=this.dataset.fb">`;
+  return badge;
 }
-
-export const sportName = id => L().sports[id]?.name || id;
-
-// A finished or upcoming game as a small card.
-export function gameCard(sport, ss, g) {
-  const c = g.c && L().conferences[g.c];
-  const fin = g.hs != null, w = fin ? winner(g) : null;
-  const row = (side, t, s) => `<div class="ln"><div class="t ${fin ? (w === side ? 'winner' : w ? 'loser' : '') : ''}">${school(t, { link: false })}</div><div class="s">${fin ? s : ''}</div></div>`;
-  const notes = [];
-  if (g.p) notes.push(`<span class="badge gold">${esc(g.rd || 'Championship')}</span>`);
-  else if (g.ct) notes.push(`<span class="badge">${esc(L().conferences[g.ct]?.abbr || '')} Tournament${g.rd ? ` · ${esc(g.rd)}` : ''}</span>`);
-  if (g.n) notes.push(`Game ${g.n}`);
-  if (g.ot) notes.push(sport.model === 'innings' ? `${sport.params.innings + g.ot} inn` : g.ot > 1 ? `${g.ot}OT` : 'OT');
-  if (g.so) notes.push('Shootout');
-  if (g.site) notes.push(esc(g.site.name));
-  else if (g.neu) notes.push('Neutral site');
-  return `<div class="game ${c ? 'conf' : ''} ${fin ? '' : 'pending'}" style="${c ? `--cc:${c.color}` : ''}" data-game="${g.id}" data-sport="${sport.id}">
-    ${row('away', g.a, g.as)}${row('home', g.h, g.hs)}
-    <div class="meta">${c ? confBadge(g.c, { link: false }) : g.p || g.ct ? '' : '<span>Non-conference</span>'}${notes.map(n => `<span>${n}</span>`).join('')}${fin ? '<span class="badge final" style="margin-left:auto">Final</span>' : ''}</div>
-  </div>`;
-}
-
-export function bindGameCards(root = app) {
-  for (const el of $$('[data-game]', root)) el.onclick = () => openGame(el.dataset.sport, Number(el.dataset.game));
-}
-
-function periodLabels(sport, n, g) {
-  const p = sport.params;
-  if (sport.model === 'innings') return Array.from({ length: n }, (_, i) => i + 1);
-  if (sport.model === 'sets') return Array.from({ length: n }, (_, i) => (p.flights ? `P${i + 1}` : `S${i + 1}`));
-  const reg = sport.model === 'football' ? 4 : p.periods;
-  return Array.from({ length: n }, (_, i) => (i < reg ? (reg === 2 ? `${i + 1}H` : reg === 3 ? `P${i + 1}` : `Q${i + 1}`) : n - reg > 1 ? `OT${i - reg + 1}` : 'OT'));
-}
-
-export function openModal(html, bind = () => {}) {
-  modal.innerHTML = html;
-  modal.showModal();
-  for (const b of $$('[data-close]', modal)) b.onclick = () => modal.close();
-  bind(modal);
-}
-
-export function openGame(sportId, id) {
-  const lg = L(), sport = lg.sports[sportId], ss = VY().sports[sportId];
-  const g = ss?.games.find(x => x.id === id);
-  if (!g) return;
-  const fin = g.hs != null, w = fin ? winner(g) : null;
-  const n = fin ? Math.max(g.line[0].length, g.line[1].length) : 0;
-  const labels = fin ? periodLabels(sport, n, g) : [];
-  const total = sport.model === 'sets' ? (sport.params.flights ? 'Pts' : 'Sets') : sport.model === 'innings' ? 'R' : 'T';
-  const extra = sport.model === 'innings' && g.hits ? ['H', 'E'] : [];
-  const row = (side, t, line, s, i) => `<tr><td>${school(t)}</td>${line.map(x => `<td>${x == null ? 'x' : x}</td>`).join('')}<td class="tot ${w === side ? 'winner' : ''}">${s}</td>${extra.length ? `<td>${g.hits[i]}</td><td>${g.errors[i]}</td>` : ''}</tr>`;
-  const conf = g.c ? `${confBadge(g.c)} conference game` : g.ct ? `${confBadge(g.ct)} ${esc(lg.conferences[g.ct]?.name || '')} Tournament${g.rd ? `, ${esc(g.rd)}` : ''}` : g.p ? esc(g.rd || 'National championship') : 'Non-conference';
-  const where = g.site ? `${esc(g.site.name)}${g.site.city ? `, ${esc(g.site.city)}` : ''}` : g.neu ? 'Neutral site' : `at ${esc(lg.schools[g.h]?.city || '')}${lg.schools[g.h]?.state ? `, ${esc(lg.schools[g.h].state)}` : ''}`;
-  openModal(`<div class="modal-head"><h2>${esc(lg.schools[g.a]?.short)} at ${esc(lg.schools[g.h]?.short)}</h2><button class="btn ghost" data-close>Close</button></div>
-    <div class="modal-body stack">
-      <div class="muted">${esc(sport.name)} · ${weekLabel(lg.viewYear, g.w)} · ${yearLabel(lg.viewYear)} · ${where} · ${conf}${g.p ? ' · National championship' : ''}${g.n ? ` · Game ${g.n}` : ''}</div>
-      ${fin ? `<div class="lscore"><table><thead><tr><th></th>${labels.map(l => `<th>${l}</th>`).join('')}<th>${total}</th>${extra.map(x => `<th>${x}</th>`).join('')}</tr></thead>
-        <tbody>${row('away', g.a, g.line[1], g.as, 1)}${row('home', g.h, g.line[0], g.hs, 0)}</tbody></table></div>
-        ${g.so ? `<div class="hint">Tied after overtime; ${esc(lg.schools[g.so === 'home' ? g.h : g.a]?.short)} won the shootout.</div>` : ''}
-        ${g.detail ? `<div class="small muted">Pairs: ${g.detail.map((d, i) => `#${i + 1} ${d}`).join(' · ')}</div>` : ''}`
-        : '<div class="empty">Not played yet.</div>'}
-    </div>`);
-}
-
-// <option> list helper.
-export function options(list, selected) {
-  return list.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(selected) ? 'selected' : ''}>${esc(l)}</option>`).join('');
-}
+export const sportTag = sport => `<span class="badge sport-${sport.gender}">${esc(sport.name)}</span>`;
+export const rec = r => `${r.w}-${r.l}${r.t ? `-${r.t}` : ''}`;
+export const confRec = r => `${r.cw}-${r.cl}${r.ct ? `-${r.ct}` : ''}`;

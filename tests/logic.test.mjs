@@ -1,350 +1,174 @@
-// Logic tests: node tests/logic.test.mjs
+// Logic tests: run with `node tests/logic.test.mjs`
+// The fixtures are real backups from each AAU dynasty app (two simulated
+// seasons each, trimmed and gzipped).
 import assert from 'node:assert/strict';
-import { SCHOOLS } from '../js/schools.js';
-import { SPORT_CATALOG } from '../js/sports.js';
-import { SEED_PROGRAMS, seedFor } from '../js/seed.js';
-import { logoFor, setTables, gistTable, espnTable } from '../js/logos.js';
-import { newLeague, seedSport, program, createConference, joinConference, leaveConference, confOf, confMembers, addProgram, dropProgram, hasProgram, effectiveYear, dissolveConference, addSchool, addSport, weekStart, curYear } from '../js/league.js';
-import { buildSchedule, roundRobin } from '../js/schedule.js';
-import { startSeason, simWeek, simUntil, startNextYear } from '../js/season.js';
-import { records, rpi } from '../js/standings.js';
-import { play, winner } from '../js/game.js';
-import { bracketOrder, buildBracket } from '../js/postseason.js';
-import { createEvent, pendingMatchups, recordMatchup, advanceEvent, matchupLength, advancers } from '../js/events.js';
-import { DEFAULT_FORMATS, checkFormat, newStage } from '../js/formats.js';
-import { quadCuts, compare, committeeOrder, teamSheets } from '../js/selection.js';
-import { redrawConfTourney, confirmTeams, announce, finishOf } from '../js/champs.js';
-import { rng } from '../js/util.js';
+import { readFileSync, readdirSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+import { detectSport, isDynastyBackup, SPORTS } from '../js/sports.js';
+import { extractDynasty, resultFor, winnerOf } from '../js/extract.js';
+import { emptyHistory, mergeDynasty, isHistoryBackup, repairHistory } from '../js/store.js';
+import { cupStandings, cupYears, finishPoints } from '../js/cup.js';
+import { APPS, appFor, appHref } from '../js/live.js';
 
-let passed = 0;
-const test = (name, fn) => { try { fn(); passed++; } catch (e) { console.error(`FAIL ${name}\n`, e); process.exitCode = 1; } };
+const t0 = Date.now();
+let n = 0;
+const check = (name, fn) => { try { fn(); } catch (e) { console.error(`✗ ${name}`); throw e; } n++; };
+const FX = new URL('./fixtures/', import.meta.url);
+const load = f => JSON.parse(gunzipSync(readFileSync(new URL(f, FX))).toString());
+const files = readdirSync(FX).filter(f => f.endsWith('.json.gz'));
+const backups = Object.fromEntries(files.map(f => [f.replace('.json.gz', ''), load(f)]));
 
-test('73 AAU schools with unique ids', () => {
-  assert.equal(SCHOOLS.length, 73);
-  assert.equal(new Set(SCHOOLS.map(s => s.id)).size, 73);
-  assert.equal(SCHOOLS.filter(s => s.country === 'CA').length, 2);
-});
-
-test('seed programs point at real schools and sports, no duplicates', () => {
-  const ids = new Set(SCHOOLS.map(s => s.id)), sports = new Set(SPORT_CATALOG.map(s => s.id));
-  const keys = SEED_PROGRAMS.map(p => `${p.school}:${p.sport}`);
-  for (const p of SEED_PROGRAMS) { assert.ok(ids.has(p.school), p.school); assert.ok(sports.has(p.sport), p.sport); }
-  assert.equal(new Set(keys).size, keys.length);
-});
-
-test('week 1 starts on the last Monday of August', () => {
-  const d = weekStart(2030, 1);
-  assert.equal(d.getUTCDay(), 1);
-  assert.equal(d.getUTCMonth(), 7);
-  assert.ok(d.getUTCDate() >= 25);
-});
-
-test('round robin: everyone meets once', () => {
-  const rr = roundRobin(['a', 'b', 'c', 'd', 'e']);
-  const seen = new Set();
-  for (const rd of rr) for (const [h, a] of rd) seen.add([h, a].sort().join());
-  assert.equal(seen.size, 10);
-});
-
-test('full members, affiliates and sport-only conferences', () => {
-  const L = newLeague();
-  const big = createConference(L, { name: 'Big Test', sponsors: ['fb', 'wbb'] });
-  const sbc = createConference(L, { name: 'Softball League', sponsors: ['sb'], sportOnly: true });
-  joinConference(L, 'michigan', big);
-  joinConference(L, 'ohiostate', big);
-  assert.equal(confOf(L, 'michigan', 'fb', 2030), big);
-  assert.equal(confOf(L, 'michigan', 'sb', 2030), null); // home conference doesn't sponsor softball
-  joinConference(L, 'michigan', sbc, ['sb']);
-  assert.equal(confOf(L, 'michigan', 'sb', 2030), sbc);
-  assert.equal(confOf(L, 'michigan', 'fb', 2030), big);
-  assert.deepEqual(confMembers(L, big, 'fb', 2030).sort(), ['michigan', 'ohiostate']);
-  // No program, no conference.
-  joinConference(L, 'caltech', big);
-  assert.equal(confOf(L, 'caltech', 'fb', 2030), null);
-  assert.equal(confOf(L, 'caltech', 'wbb', 2030), big);
-});
-
-test('realignment after the preseason takes effect next year; history kept', () => {
-  const L = newLeague();
-  const a = createConference(L, { name: 'A', sponsors: ['fb', 'wbb', 'sb'] });
-  const b = createConference(L, { name: 'B', sponsors: ['fb', 'wbb', 'sb'] });
-  joinConference(L, 'texas', a);
-  startSeason(L);
-  assert.equal(effectiveYear(L), 2031);
-  joinConference(L, 'texas', b);
-  assert.equal(confOf(L, 'texas', 'fb', 2030), a);
-  assert.equal(confOf(L, 'texas', 'fb', 2031), b);
-  const m = L.memberships.find(x => x.conf === b);
-  leaveConference(L, m.id); // never took effect → removed
-  assert.equal(confOf(L, 'texas', 'fb', 2031), null);
-  assert.equal(confOf(L, 'texas', 'fb', 2030), a);
-});
-
-test('department expansion and dropping a program', () => {
-  const L = newLeague();
-  assert.equal(hasProgram(L, 'usc', 'sb', 2030), false);
-  addProgram(L, 'usc', 'sb', { off: 50, def: 48 });
-  assert.equal(hasProgram(L, 'usc', 'sb', 2030), true);
-  dropProgram(L, 'usc', 'sb');
-  assert.equal(hasProgram(L, 'usc', 'sb', 2030), false);
-  startSeason(L);
-  dropProgram(L, 'texas', 'fb');
-  assert.equal(hasProgram(L, 'texas', 'fb', 2030), true);
-  assert.equal(hasProgram(L, 'texas', 'fb', 2031), false);
-});
-
-test('dissolving a conference ends its memberships', () => {
-  const L = newLeague();
-  const a = createConference(L, { name: 'A', sponsors: ['fb'] });
-  joinConference(L, 'texas', a);
-  dissolveConference(L, a);
-  assert.equal(L.conferences[a], undefined);
-  assert.equal(confOf(L, 'texas', 'fb', 2030), null);
-});
-
-test('schedules: nobody double-booked, conference games stay in conference, counts near target', () => {
-  for (const sport of SPORT_CATALOG) {
-    const teams = Array.from({ length: 40 }, (_, i) => `t${i}`);
-    const conf = t => { const n = +t.slice(1); return n < 12 ? 'A' : n < 22 ? 'B' : n < 36 ? 'C' : null; };
-    const games = buildSchedule(sport, teams, conf, { seed: 3 });
-    const slot = new Map();
-    const count = Object.fromEntries(teams.map(t => [t, 0]));
-    for (const g of games) {
-      for (const t of [g.h, g.a]) {
-        const k = `${t}:${g.w}:${g.s}`;
-        const opp = g.h === t ? g.a : g.h;
-        if (slot.has(k)) assert.equal(slot.get(k), opp, `${sport.id} ${k} double-booked`);
-        slot.set(k, opp);
-        count[t]++;
-      }
-      if (g.c) assert.ok(conf(g.h) === g.c && conf(g.a) === g.c, `${sport.id} conference game across conferences`);
-      else assert.ok(!conf(g.h) || conf(g.h) !== conf(g.a), `${sport.id} non-conference game inside a conference`);
-    }
-    const avg = Object.values(count).reduce((a, b) => a + b) / teams.length;
-    assert.ok(avg >= sport.games * 0.85 && avg <= sport.games + 3, `${sport.id}: average ${avg} vs target ${sport.games}`);
+check('every dynasty backup is recognized as its sport', () => {
+  const want = { 'volleyball-women': 'w-volleyball', 'volleyball-men': 'm-volleyball', 'softball-softball': 'softball', 'softball-baseball': 'baseball', 'soccer-women': 'w-soccer', 'soccer-men': 'm-soccer', 'fhockey-women': 'field-hockey',
+    'basketball-women': 'w-basketball', 'basketball-men': 'm-basketball', 'lacrosse-women': 'w-lacrosse', 'lacrosse-men': 'm-lacrosse', 'hockey-women': 'w-hockey', 'hockey-men': 'm-hockey' };
+  assert.equal(files.length, 13);
+  for (const [k, lg] of Object.entries(backups)) {
+    assert.ok(isDynastyBackup(lg));
+    const { sport, sure } = detectSport(lg);
+    assert.equal(sport.id, want[k], k);
+    assert.ok(sure);
   }
+  // Renamed dynasties are still found by their results.
+  const renamed = { ...backups['soccer-women'], name: 'My League' };
+  assert.equal(detectSport(renamed).sport.id, 'w-soccer');
+  // A new sport with no results yet: a guess, flagged as unsure.
+  const unknown = detectSport({ name: "AAU Men's Water Polo", side: 'men', seasons: { 2030: { teams: {}, games: [] } } });
+  assert.ok(!unknown.sure && unknown.sport.custom && unknown.sport.gender === 'men' && /Water Polo/.test(unknown.sport.name));
+  // Backups saved before the apps tagged their sport, with a plain name:
+  // every sport is told by its line scores (women's basketball's four
+  // quarters aren't volleyball sets; lacrosse scores more than field hockey).
+  for (const [k, lg] of Object.entries(backups)) {
+    const want = detectSport(lg).sport.id;
+    assert.equal(detectSport({ ...lg, sport: undefined, name: 'My League' }).sport.id, want, `${k} without its tag`);
+  }
+  assert.ok(!isDynastyBackup({ schools: {} }));
 });
 
-test('every model produces a decided playoff game', () => {
-  const r = rng(11);
-  for (const sport of SPORT_CATALOG) {
-    for (let i = 0; i < 200; i++) {
-      const g = play(sport, { off: 70, def: 70 }, { off: 70, def: 70 }, { playoff: true, r });
-      assert.ok(winner(g), `${sport.id} playoff tie`);
-      assert.equal(g.line[0].filter(x => x != null).reduce((a, b) => a + b, 0) + (sport.model === 'sets' && !sport.params.flights ? 0 : 0) >= 0, true);
+check('results follow each sport\'s rules', () => {
+  const pkGame = { home: 'A', away: 'B', homeR: 1, awayR: 1, pk: { home: 4, away: 3 } };
+  assert.equal(winnerOf(pkGame), 'A');
+  assert.equal(resultFor(pkGame, 'A', SPORTS['w-soccer']), 'T', 'soccer: a shootout is a tie in the record');
+  assert.equal(resultFor(pkGame, 'A', SPORTS['field-hockey']), 'W', 'field hockey: the shootout winner gets the win');
+  assert.equal(resultFor(pkGame, 'B', SPORTS['field-hockey']), 'L');
+});
+
+const H = emptyHistory();
+const ext = {};
+for (const [k, lg] of Object.entries(backups)) { const sport = detectSport(lg).sport; ext[sport.id] = extractDynasty(lg, sport); mergeDynasty(H, ext[sport.id], { fileName: k }); }
+
+check('each season\'s champions, records and finishes', () => {
+  for (const [id, e] of Object.entries(ext)) {
+    assert.deepEqual(Object.keys(e.years), ['2030', '2031'], id);
+    for (const s of Object.values(e.years)) {
+      assert.ok(s.complete && s.champion && s.runnerUp && s.champion !== s.runnerUp, id);
+      const c = s.teams[s.champion];
+      assert.equal(c.finish, 'champion');
+      assert.equal(s.teams[s.runnerUp].finish, 'runner-up');
+      assert.ok(c.w > c.l, `${id}: the champion has a winning record`);
+      assert.equal(Object.values(s.teams).filter(t => t.finish).length, s.fieldSize, `${id}: every team in the field has a finish`);
+      assert.ok(Object.values(s.teams).every(t => t.w + t.l + t.t > 0), `${id}: everyone played`);
+      assert.ok(Object.keys(s.regChamps).length > 0, `${id}: regular-season champions`);
     }
   }
+  // Soccer and ice hockey have ties; field hockey, basketball and lacrosse never do.
+  for (const id of ['w-soccer', 'm-hockey', 'w-hockey']) assert.ok(Object.values(ext[id].years[2031].teams).some(t => t.t > 0), id);
+  for (const id of ['field-hockey', 'w-basketball', 'm-basketball', 'w-lacrosse', 'm-lacrosse']) assert.ok(Object.values(ext[id].years[2031].teams).every(t => t.t === 0), id);
+  assert.equal(ext['m-basketball'].years[2031].fieldSize, 32);
+  assert.equal(ext['w-basketball'].years[2031].finalsName, 'Final Four');
+  assert.equal(ext['m-hockey'].years[2031].finalsName, 'Frozen Four');
+  // Conference tournament champions where the sport has them.
+  assert.ok(Object.keys(ext.softball.years[2031].confTChamps).length > 0);
+  assert.equal(Object.keys(ext['field-hockey'].years[2031].confTChamps).length, 4);
+  // Coaches and conferences come along.
+  const t = ext.baseball.years[2030].teams.Vanderbilt;
+  assert.ok(t.coach && t.conf);
+  assert.ok(ext.baseball.conferences['Big Ten'].logo.startsWith('img/conf/'));
 });
 
-test('line scores add up to the final score', () => {
-  const r = rng(5);
-  for (const sport of SPORT_CATALOG.filter(s => s.model !== 'sets')) {
-    for (let i = 0; i < 200; i++) {
-      const g = play(sport, { off: 75, def: 65 }, { off: 66, def: 72 }, { r });
-      const sum = l => l.reduce((a, b) => a + (b || 0), 0);
-      assert.equal(sum(g.line[0]), g.hs, `${sport.id} home line`);
-      assert.equal(sum(g.line[1]), g.as, `${sport.id} away line`);
-    }
-  }
+check('the all-sports cup', () => {
+  assert.deepEqual(cupYears(H), [2030, 2031]);
+  const c = cupStandings(H, 2031);
+  assert.equal(c.sports.length, 13);
+  assert.deepEqual(c.sports.map(x => x.id), Object.keys(SPORTS), 'in season order');
+  const champs = Object.values(H.dynasties).map(d => d.years[2031].champion);
+  for (const x of c.schools) assert.equal(x.total, Object.values(x.bySport).reduce((a, b) => a + b, 0));
+  assert.ok(c.schools[0].total >= c.schools[1].total);
+  assert.ok(champs.every(t => c.schools.find(x => x.school === t).total >= 100));
+  const w = cupStandings(H, 2031, 'women'), m = cupStandings(H, 2031, 'men');
+  assert.equal(w.sports.length, 7); assert.equal(m.sports.length, 6);
+  assert.ok(w.sports.every(s => s.gender === 'women'));
+  // Conference totals are their members' points.
+  const conf = c.conferences.find(x => x.conf === 'Big Ten');
+  assert.ok(conf.total > 0 && conf.schools > 5);
+  assert.equal(finishPoints({ finish: 'field', natW: 10 }), 50, 'the field bonus is capped');
+  assert.equal(finishPoints({}), 0);
 });
 
-test('bracket order keeps 1 and 2 apart', () => {
-  const o = bracketOrder(8);
-  assert.deepEqual(o, [1, 8, 4, 5, 2, 7, 3, 6]);
-  const b = buildBracket(Array.from({ length: 12 }, (_, i) => ({ school: `s${i + 1}`, seed: i + 1 })));
-  assert.equal(b.rounds[0].filter(m => m.winner).length, 4); // four byes
+check('uploading again replaces seasons and keeps older ones', () => {
+  const h = emptyHistory();
+  const lg = backups['soccer-men'], sport = detectSport(lg).sport;
+  mergeDynasty(h, extractDynasty(lg, sport));
+  // A newer file that only has 2031 (2030 dropped) with a changed champion.
+  const newer = JSON.parse(JSON.stringify(lg));
+  delete newer.seasons[2030];
+  newer.seasons[2031].post.champion = 'Stanford';
+  const r = mergeDynasty(h, extractDynasty(newer, sport));
+  assert.deepEqual(r, { added: 0, updated: 1, kept: 1 });
+  assert.equal(h.dynasties['m-soccer'].years[2031].champion, 'Stanford');
+  assert.ok(h.dynasties['m-soccer'].years[2030]);
+  assert.ok(isHistoryBackup(h) && !isHistoryBackup(lg));
 });
 
-test('a full year plays out with champions, then rolls over', () => {
-  const L = newLeague();
-  const c1 = createConference(L, { name: 'East', sponsors: ['fb', 'wbb', 'sb'] });
-  const c2 = createConference(L, { name: 'West', sponsors: ['fb', 'wbb', 'sb'] });
-  ['michigan', 'ohiostate', 'pennstate', 'maryland', 'rutgers', 'indiana', 'purdue', 'northwestern'].forEach(s => joinConference(L, s, c1));
-  ['ucla', 'usc', 'stanford', 'cal', 'oregon', 'washington', 'utah', 'arizona', 'asu'].forEach(s => joinConference(L, s, c2));
-  startSeason(L);
-  simUntil(L, () => false);
-  const Y = curYear(L);
-  assert.equal(Y.phase, 'complete');
-  for (const id of ['fb', 'wbb', 'sb']) {
-    const ss = Y.sports[id];
-    assert.ok(ss.champion, `${id} champion`);
-    assert.ok(ss.games.every(g => g.hs != null), `${id} unplayed games`);
-    const rec = records(ss);
-    assert.ok(Object.values(rec).every(r => r.w + r.l + r.t > 0));
-    const r = rpi(ss);
-    assert.ok(Object.values(r).every(x => x >= 0 && x <= 1));
-  }
-  // Auto bids went to the two conference champions in football.
-  assert.equal(Y.sports.fb.sel.auto.length, 2);
-  assert.ok(Y.sports.fb.ct && Object.keys(Y.sports.fb.ct).length === 2, 'football conference championship games');
-  startNextYear(L);
-  assert.equal(L.currentYear, 2031);
-  startSeason(L);
-  simWeek(L);
-  assert.ok(Object.keys(curYear(L).sports.fb.teams).length > 40);
+check('a season in progress is kept but not scored', () => {
+  const lg = JSON.parse(JSON.stringify(backups['fhockey-women']));
+  const s = lg.seasons[2031];
+  s.phase = 'regular'; delete s.post.champion;
+  const e = extractDynasty(lg, SPORTS['field-hockey']);
+  assert.ok(!e.years[2031].complete);
+  const h = emptyHistory(); mergeDynasty(h, e);
+  assert.deepEqual(cupYears(h), [2030]);
 });
 
-test('new schools and sports', () => {
-  const L = newLeague();
-  const id = addSchool(L, { name: 'University of Nowhere', short: 'Nowhere' });
-  addProgram(L, id, 'wbb', { off: 50, def: 50 });
-  const sid = addSport(L, 'wbb', { name: "Women's 3x3 Basketball", id: 'w3x3' });
-  addProgram(L, id, sid);
-  addProgram(L, 'texas', sid);
-  startSeason(L);
-  assert.ok(curYear(L).sports.w3x3);
-  assert.ok(curYear(L).sports.wbb.teams[id]);
+check('a backup filed under the wrong sport is cleared', () => {
+  const h = emptyHistory();
+  const vb = backups['volleyball-women'], bb = backups['basketball-women'];
+  mergeDynasty(h, extractDynasty(vb, SPORTS['w-volleyball']), { fileName: 'AAU-Volleyball-2030.json' });
+  mergeDynasty(h, extractDynasty(bb, SPORTS['w-basketball']), { fileName: 'AAU-Women-s-Basketball-2030.json' });
+  assert.deepEqual(repairHistory(h), [], 'a right history is left alone');
+  mergeDynasty(h, extractDynasty(bb, SPORTS['w-volleyball']), { fileName: 'AAU-Women-s-Basketball-2030.json' });
+  const removed = repairHistory(h);
+  assert.deepEqual(removed.map(r => r.name), ["Women's Volleyball"]);
+  assert.ok(!h.dynasties['w-volleyball'] && h.dynasties['w-basketball']);
 });
 
-test('every sport has real-life sponsors that are AAU schools', () => {
-  const ids = SCHOOLS.map(s => s.id), known = new Set(ids);
-  for (const sport of SPORT_CATALOG) {
-    const list = seedFor(sport.id, ids);
-    assert.ok(list.length >= 8, `${sport.id}: only ${list.length} programs`);
-    for (const p of list) { assert.ok(known.has(p.school), `${sport.id}: ${p.school}`); assert.ok(p.off >= 20 && p.off <= 99 && p.def >= 20 && p.def <= 99); }
-    assert.equal(new Set(list.map(p => p.school)).size, list.length, `${sport.id} duplicates`);
-  }
-  assert.equal(seedFor('mbb', ids).length, 73);
+// Each season keeps its summary and, since version 2, its games for the
+// school pages' schedules: about 60 KB a season.
+check('the history stays small', () => {
+  assert.ok(JSON.stringify(H).length < 26 * 100000, `${JSON.stringify(H).length} bytes for 26 seasons`);
 });
 
-test('turning a sport on adds its real-life programs once, and respects drops', () => {
-  const L = newLeague();
-  assert.equal(Object.values(L.programs).filter(p => p.sport === 'mih').length, 0);
-  const n = seedSport(L, 'mih');
-  assert.ok(n >= 15);
-  assert.ok(program(L, 'michigan', 'mih'));
-  assert.ok(!program(L, 'texas', 'mih'));
-  dropProgram(L, 'michigan', 'mih');
-  assert.equal(seedSport(L, 'mih'), 0);
-  assert.equal(hasProgram(L, 'michigan', 'mih', 2030), false);
-  // Mid-season activation starts programs next year.
-  startSeason(L);
-  seedSport(L, 'mlax');
-  assert.equal(hasProgram(L, 'jhu', 'mlax', 2030), false);
-  assert.equal(hasProgram(L, 'jhu', 'mlax', 2031), true);
+// The hub reads every sport's app: each known sport has exactly one save.
+check('every sport maps to its app and save', () => {
+  const ids = APPS.flatMap(a => a.saves.map(x => x[1]));
+  assert.equal(new Set(ids).size, ids.length);
+  for (const id of Object.keys(SPORTS)) assert.ok(appFor(id), id);
+  assert.equal(appHref('m-basketball', '#/team/Duke'), '../uaa-basketball/#/team/Duke');
+  assert.equal(appFor('baseball').side, 'baseball');
 });
 
-test('logos: own logo, football list, then ESPN by full name', () => {
-  setTables({
-    gist: gistTable('school,logo,alt_name1\nMichigan,http://a/mich.png,UM\nMiami,https://a/miami.png,\nPittsburgh,https://a/pitt.png,Pitt\n'),
-    espn: espnTable({ sports: [{ leagues: [{ teams: [
-      { team: { displayName: 'UC San Diego Tritons', location: 'UC San Diego', logos: [{ href: 'https://e/ucsd.png' }] } },
-      { team: { displayName: 'Washington Huskies', location: 'Washington', logos: [{ href: 'https://e/uw.png' }] } },
-    ] }] }] }),
-  });
-  const S = Object.fromEntries(SCHOOLS.map(s => [s.id, s]));
-  assert.equal(logoFor(S.michigan), 'https://a/mich.png');
-  assert.equal(logoFor(S.miami), 'https://a/miami.png');
-  assert.equal(logoFor(S.pitt), 'https://a/pitt.png');
-  assert.equal(logoFor(S.ucsd), 'https://e/ucsd.png');
-  assert.equal(logoFor(S.washington), 'https://e/uw.png');
-  assert.equal(logoFor(S.washu), null);
-  assert.equal(logoFor({ ...S.washu, logo: 'data:image/png;base64,xx' }), 'data:image/png;base64,xx');
-  setTables(null);
+// A season with no results yet adds nothing to the record book, but its
+// schedule goes to the calendar.
+check('an unstarted season goes to the calendar only', () => {
+  const lg = structuredClone(backups['basketball-men']);
+  const y = Math.max(...Object.keys(lg.seasons).map(Number));
+  for (const g of lg.seasons[y].games) { g.final = false; g.homeR = g.awayR = null; g.homeLine = []; g.awayLine = []; }
+  const ext = extractDynasty(lg, SPORTS['m-basketball']);
+  assert.ok(!(y in ext.years));
+  assert.ok(ext.upcoming[y].games.length > 100);
+  assert.ok(ext.upcoming[y].games.every(g => g.hr == null));
+  assert.ok(Object.values(ext.upcoming[y].conf).some(Boolean));
+  const h = emptyHistory(); mergeDynasty(h, ext);
+  assert.equal(JSON.parse(JSON.stringify(h)).dynasties['m-basketball'].upcoming, undefined, 'not saved');
 });
 
-function runEvent(opts) {
-  const ev = createEvent({ id: 't', teams: Array.from({ length: opts.n }, (_, i) => `t${i + 1}`), ...opts });
-  const G = {}; let id = 0, guard = 500;
-  while (!ev.done && guard--) {
-    const p = pendingMatchups(ev);
-    if (!p.length) { advanceEvent(ev, x => G[x]); continue; }
-    for (const m of p) {
-      const len = matchupLength(ev, m), ids = []; let wa = 0, wb = 0, k = 0;
-      while (len.fixed ? k < len.fixed : wa < len.need && wb < len.need) { k++; const g = { id: ++id, h: m.a, a: m.b }; const aw = (id * 7) % 3 !== 0; g.hs = aw ? 3 : 1; g.as = aw ? 1 : 3; G[g.id] = g; ids.push(g.id); aw ? wa++ : wb++; }
-      recordMatchup(ev, m, ev.kind === 'pool' ? null : wa > wb ? m.a : m.b, ids);
-    }
-  }
-  return { ev, games: id };
-}
-
-test('tournament formats all finish with one champion', () => {
-  for (const n of [2, 3, 4, 5, 6, 7, 8, 9, 12, 16]) {
-    for (const kind of ['single', 'double', 'playin']) {
-      const { ev, games } = runEvent({ n, kind, ifNecessary: true });
-      assert.ok(ev.done && ev.winner, `${kind} ${n}`);
-      assert.equal(ev.finish.length, n, `${kind} ${n} finish order`);
-      if (kind === 'single') assert.equal(games, n - 1);
-      if (kind === 'double') assert.ok(games >= 2 * n - 2 && games <= 2 * n - 1, `${kind} ${n}: ${games} games`);
-    }
-  }
-  const pool = runEvent({ n: 4, kind: 'pool', advance: 2, gpm: 2 });
-  assert.equal(pool.games, 12);
-  assert.equal(advancers(pool.ev).length, 2);
-  const series = runEvent({ n: 2, kind: 'single', bestOf: 3 });
-  assert.ok(series.games >= 2 && series.games <= 3);
-  // A classic 4-team regional: 1v4 and 2v3 first.
-  const reg = createEvent({ id: 'r', teams: ['a', 'b', 'c', 'd'], kind: 'double' });
-  assert.deepEqual(pendingMatchups(reg).map(m => [m.a, m.b]), [['a', 'd'], ['b', 'c']]);
-});
-
-test('every default championship format is valid', () => {
-  for (const [id, f] of Object.entries(DEFAULT_FORMATS)) assert.deepEqual(checkFormat(f), [], id);
-  assert.ok(checkFormat({ field: 16, stages: [newStage({ groups: 4, size: 4 }), newStage({ size: 2 })] }).length > 0);
-});
-
-test('quadrants scale with the sport', () => {
-  const q = quadCuts(360);
-  assert.deepEqual(q.home, [30, 75, 160]);
-  const small = quadCuts(60);
-  assert.deepEqual(small.home, [5, 13, 27]);
-});
-
-test('every sport plays a full year: conference tournaments, selection, stages', () => {
-  const L = newLeague();
-  for (const sp of Object.keys(L.sports)) { L.sports[sp].active = true; seedSport(L, sp); }
-  const all = Object.keys(L.sports);
-  const confs = [['A', 'michigan ohiostate pennstate maryland rutgers indiana purdue northwestern illinois iowa wisconsin minnesota msu'], ['B', 'ucla usc stanford cal oregon washington utah arizona asu colorado'], ['C', 'harvard yale princeton penn columbia cornell brown dartmouth'], ['D', 'brandeis cmu case chicago emory nyu rochester washu']];
-  for (const [n, m] of confs) { const c = createConference(L, { name: n, sponsors: all }); m.split(' ').forEach(s => joinConference(L, s, c)); }
-  // A pool-play championship for women's water polo.
-  L.sports.wwp.champ = { ...L.sports.wwp.champ, field: 8, stages: [newStage({ name: 'Pools', label: 'Pool', groups: 2, size: 4, kind: 'pool', advance: 2 }), newStage({ name: 'Final Four', size: 4, venues: [{ name: 'X', city: 'Y' }] })] };
-  startSeason(L);
-  simUntil(L, () => false);
-  const Y = curYear(L);
-  assert.equal(Y.phase, 'complete');
-  for (const [id, ss] of Object.entries(Y.sports)) {
-    assert.ok(ss.champion, `${id} champion`);
-    assert.equal(ss.natl.champion, ss.champion);
-    assert.equal(finishOf(ss, ss.champion), 'National champion');
-    const n = ss.natl.fmt.stages.length;
-    assert.equal(ss.natl.stages.length, n, `${id} stages`);
-    const field = Object.keys(ss.natl.seeds).length;
-    assert.equal(field, ss.natl.fmt.field);
-    // No team is in two sites of one stage.
-    for (const st of ss.natl.stages) { const t = st.groups.flatMap(e => e.teams); assert.equal(new Set(t).size, t.length, `${id} ${st.name}`); }
-  }
-  // Softball: 8 regionals of 4 → two WCWS brackets → a best-of-3 series.
-  const sb = Y.sports.sb.natl;
-  assert.deepEqual(sb.stages.map(s => s.groups.length), [8, 2, 1]);
-  assert.ok(sb.stages[0].groups[0].teams.includes(Object.keys(sb.seeds)[0]));
-  const bracketA = sb.stages[1].groups[0].teams.map(t => sb.seeds[t]);
-  assert.ok(Math.min(...bracketA) === 1 || bracketA.length === 4);
-  // Pools sent two teams each.
-  assert.equal(Y.sports.wwp.natl.stages[1].groups[0].teams.length, 4);
-});
-
-test('conference tournaments can be redrawn before they start; seeds can be set by hand', () => {
-  const L = newLeague();
-  const all = Object.keys(L.sports);
-  const c = createConference(L, { name: 'A', sponsors: all });
-  'michigan ohiostate pennstate maryland rutgers indiana purdue northwestern'.split(' ').forEach(s => joinConference(L, s, c));
-  startSeason(L);
-  const ss = curYear(L).sports.sb;
-  simUntil(L, y => y.week > L.sports.sb.season[1]);
-  const ev = ss.ct[c];
-  assert.ok(ev && !ev.started);
-  const teams = [...ev.teams].reverse().slice(0, 4);
-  redrawConfTourney(L, L.sports.sb, ss, c, { teams, set: { size: 4, kind: 'single', bestOf: 3, hosting: 'venue', venue: { name: 'Park', city: 'Town' } } });
-  assert.deepEqual(ss.ct[c].teams, teams);
-  simWeek(L);
-  assert.ok(ss.ct[c].done);
-  assert.ok(ss.games.filter(g => g.ct === c).every(g => g.site?.name === 'Park'));
-  assert.ok(ss.sel && ss.sel.status === 'open');
-  confirmTeams(L, L.sports.sb, ss);
-  ss.sel.seeds.reverse();
-  const top = ss.sel.seeds[0];
-  announce(L, L.sports.sb, ss, curYear(L).week);
-  assert.equal(ss.natl.seeds[top], 1);
-});
-
-console.log(`${passed} tests passed`);
+console.log(`${n} checks ok in ${Date.now() - t0} ms`);

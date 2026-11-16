@@ -1,59 +1,72 @@
-// App shell: loading the dynasty, the top bar, and page routing.
+// App shell: loading the record book and the apps' saves, the top bar and
+// page routing.
 
-import { loadLeague, saveLeague } from './store.js?v=20261030224435';
-import { newLeague, migrateLeague, yearLabel } from './league.js?v=20261030224435';
-import { ctx, app, persist, esc } from './ui.js?v=20261030224435';
-import { renderHome } from './views-home.js?v=20261030224435';
-import { renderSports, renderSport } from './views-sports.js?v=20261030224435';
-import { renderSchools, renderSchool } from './views-schools.js?v=20261030224435';
-import { renderConferences, renderConference } from './views-confs.js?v=20261030224435';
-import { renderHistory, renderSettings } from './views-admin.js?v=20261030224435';
-import { loadLogos } from './logos.js?v=20261030224435';
+import { loadHistory, repairHistory, saveHistory, mergeDynasty } from './store.js?v=20261115173051';
+import { loadLive } from './live.js?v=20261115173051';
+import { extractDynasty } from './extract.js?v=20261115173051';
+import { renderCalendar } from './calendar.js?v=20261115173051';
+import { renderSports } from './sports-page.js?v=20261115173051';
+import { loadLogoTable } from './logos.js?v=20261115173051';
+import { renderSchool } from './school.js?v=20261115173051';
+import { renderTournament } from './tournament.js?v=20261115173051';
+import { renderConference, renderConferences } from './conference.js?v=20261115173051';
+import { ctx, app, esc } from './ui.js?v=20261115173051';
+import { renderHome, renderChampions, renderSchools, renderCup, renderData } from './views.js?v=20261115173051';
 
-const VIEWS = { home: 'Home', sports: 'Sports', schools: 'Schools', conferences: 'Conferences', history: 'History', settings: 'Settings' };
-const SUBVIEWS = { sport: 'sports', school: 'schools', conference: 'conferences' };
-const RENDER = {
-  home: renderHome, sports: renderSports, schools: renderSchools, conferences: renderConferences, history: renderHistory, settings: renderSettings,
-  sport: () => renderSport(routeArgs()), school: () => renderSchool(routeArgs()[0]), conference: () => renderConference(routeArgs()[0]),
-};
+const VIEWS = { home: 'Home', calendar: 'Calendar', sports: 'Sports', champions: 'Champions', tournament: 'Tournaments', schools: 'Schools', conferences: 'Conferences', cup: 'All-Sports Cup', data: 'Data' };
+const SUBVIEWS = { school: 'schools', conference: 'conferences' };
+const RENDER = { calendar: () => renderCalendar(routeParts()), sports: renderSports, home: renderHome, champions: renderChampions, schools: renderSchools, school: () => renderSchool(routeParts()), tournament: () => renderTournament(routeParts()), conferences: renderConferences, conference: () => renderConference(routeParts()), cup: renderCup, data: renderData };
 
 function currentView() { const v = location.hash.replace(/^#\/?/, '').split('/')[0]; return VIEWS[v] || SUBVIEWS[v] ? v : 'home'; }
-function routeArgs() { return location.hash.replace(/^#\/?/, '').split('/').slice(1).map(decodeURIComponent); }
+// The route's parts after the page name, each decoded (a school name may hold any character).
+function routeParts() { return location.hash.replace(/^#\/?/, '').split('/').slice(1).map(p => { try { return decodeURIComponent(p); } catch { return p; } }); }
 
-function renderChrome() {
-  const L = ctx.league;
-  document.getElementById('league-name').textContent = L.name;
-  document.title = L.name;
+function render() {
   const v = currentView();
   document.getElementById('nav').innerHTML = Object.entries(VIEWS).map(([k, label]) => `<a href="#/${k}" class="${k === v || SUBVIEWS[v] === k ? 'active' : ''}">${label}</a>`).join('');
-  const years = Object.keys(L.years).map(Number).sort((a, b) => b - a);
-  const picker = document.getElementById('season-picker');
-  picker.innerHTML = `<select aria-label="Year">${years.map(y => `<option value="${y}" ${y === L.viewYear ? 'selected' : ''}>${yearLabel(y)}${y === L.currentYear ? '' : ' (past)'}</option>`).join('')}</select>`;
-  picker.querySelector('select').onchange = e => { L.viewYear = Number(e.target.value); persist(); render(); };
+  try { RENDER[v](); } catch (e) {
+    console.error(e);
+    app.innerHTML = `<div class="empty">Something went wrong showing this page: ${esc(e.message)}</div>`;
+  }
 }
 
-export function render() {
-  renderChrome();
-  try { RENDER[currentView()](); }
-  catch (e) { console.error(e); app.innerHTML = `<div class="empty">Something went wrong drawing this page: ${esc(e.message)}</div>`; }
-}
+// Brackets are fitted to the window, so draw them again when it resizes.
+let resizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (currentView() === 'tournament') render(); }, 150); });
 
 let lastView = null;
-window.addEventListener('hashchange', () => { const v = location.hash; render(); if (v.split('/')[1] !== lastView) window.scrollTo(0, 0); lastView = v.split('/')[1]; });
+window.addEventListener('hashchange', () => { const v = currentView(); render(); if (v !== lastView) window.scrollTo(0, 0); lastView = v; });
+
+// Read every sport app's save in this browser and fold it into the record
+// book (each season replaces the stored one; seasons only in the record
+// book stay). Seasons not started yet go to `ctx.upcoming` for the calendar.
+// Runs on load and when the page comes back into view (after a sim in an app).
+async function syncLive() {
+  let found = [];
+  try { found = await loadLive(); } catch (e) { console.warn('reading the apps failed', e); }
+  ctx.live = found; ctx.upcoming = {};
+  for (const { sport, league } of found) {
+    const ext = extractDynasty(league, sport);
+    if (Object.keys(ext.years).length) mergeDynasty(ctx.history, ext, { fileName: '' });
+    if (Object.keys(ext.upcoming).length) ctx.upcoming[sport.id] = { sport, years: ext.upcoming, conferences: ext.conferences, schools: ext.schools };
+  }
+  ctx.liveStamp = Date.now();
+  if (found.length) await saveHistory(ctx.history);
+}
+document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && ctx.history) { await syncLive(); render(); } });
 
 async function boot() {
   ctx.render = render;
-  let league = await loadLeague();
-  if (!league || !league.years) { league = newLeague(); await saveLeague(league); }
-  migrateLeague(league);
-  if (!league.years[league.viewYear]) league.viewYear = league.currentYear;
-  ctx.league = league;
+  ctx.history = await loadHistory();
+  const removed = repairHistory(ctx.history);
+  if (removed.length) {
+    await saveHistory(ctx.history);
+    ctx.notice = removed.map(r => `Your ${r.name} history had another sport's backup in it (${r.fileName}), so it was cleared. Upload your ${r.name} backup again, and ${r.fileName} too.`).join(' ');
+  }
   render();
-  // Logos load in the background; redraw once they're in.
-  loadLogos().then(() => render()).catch(() => {});
+  await syncLive();
+  render();
+  // Logos load in the background; draw again once they're in.
+  loadLogoTable().then(render).catch(() => {});
 }
-
-boot().catch(e => {
-  console.error(e);
-  app.innerHTML = `<div class="empty">The dynasty couldn't load: ${esc(e.message)}. Your saved dynasty hasn't been changed. Try reloading the page.</div>`;
-});
+boot();

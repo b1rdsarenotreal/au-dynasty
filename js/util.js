@@ -31,5 +31,8 @@ export const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export function pct(w, l) { const n = w + l; return n ? w / n : 0; }
+// Winning percentage; a tie counts as half a win (the NCAA's soccer rule).
+export function pct(w, l, t = 0) { const n = w + l + t; return n ? (w + t / 2) / n : 0; }
+// A W-L-T record.
+export const fmtRec = (w, l, t = 0) => `${w}-${l}-${t}`;
 export function fmtPct(x) { return x.toFixed(3).replace(/^0/, ''); }
