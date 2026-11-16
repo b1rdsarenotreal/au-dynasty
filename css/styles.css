@@ -1232,3 +1232,71 @@ table.members .dot { color: var(--ink); font-size: 12px; }
   .cd-date { font-size: 12px; }
   .cal-jump { margin-left: 0; }
 }
+
+/* School pages, like the sport apps' team pages (Nov. 2026): the header in
+   the school's colors with banners and a numbers strip, tabs, and schedule
+   boxes. Copied from AAU Field Hockey. */
+.app > .team-hero2:first-child { margin-top: -20px; }
+.team-hero2 { margin: 0 -28px 0; background: var(--tb); color: var(--ti); border-bottom: 5px solid var(--optic); }
+.th-top { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 24px; padding: 30px 28px 22px; }
+.th-logo { display: grid; place-items: center; width: 120px; height: 120px; border-radius: 22px; background: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.25); flex: none; }
+.th-logo .tbadge, .th-logo .logo, .th-logo .logo img { width: 96px !important; height: 96px !important; }
+.th-main { display: flex; flex-direction: column; gap: 6px; flex: 1 1 320px; min-width: 0; }
+.th-kick { font: 600 13px var(--body); letter-spacing: .16em; text-transform: uppercase; color: var(--ta); }
+.th-kick a { color: inherit; text-decoration: none; }
+.th-kick a:hover { text-decoration: underline; }
+.th-name { margin: 0; font: 700 56px/.95 var(--display); text-transform: uppercase; letter-spacing: .01em; color: inherit; }
+.th-rank { font: 800 40px/1 var(--mono); color: var(--ta); margin-right: 12px; vertical-align: 6px; }
+.th-mascot { opacity: .92; }
+.th-sub { font: 500 16px var(--body); opacity: .9; }
+.th-sub a { color: inherit; }
+.th-banners { display: flex; flex-wrap: wrap; gap: 10px; }
+.th-banner { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 112px; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.35); color: inherit; text-decoration: none; }
+.th-banner b { font: 800 22px/1 var(--mono); margin-top: 4px; }
+.th-banner span { font: 700 10px var(--body); letter-spacing: .1em; text-transform: uppercase; text-align: center; }
+.th-banner .conf-logo, .th-banner .conf-badge { background-color: #fff; border-radius: 5px; }
+.th-banner.gold { background: var(--optic); color: #0b1f3a; border-color: var(--optic); }
+.th-banner svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.th-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin: 0 28px; background: rgba(0,0,0,.22); border-radius: 12px 12px 0 0; }
+.th-stat { display: flex; flex-direction: column; padding: 14px 18px; }
+.th-stat b { font: 800 30px/1 var(--mono); }
+.th-stat span { font: 600 11px var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--ta); margin-top: 4px; }
+.team-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 -28px 20px; padding: 0 28px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.team-tabs a { padding: 14px; font: 600 14px var(--body); color: var(--muted); text-decoration: none; border-bottom: 3px solid transparent; }
+.team-tabs a.active { color: var(--ink); font-weight: 700; border-bottom-color: var(--tc); }
+.team-tabs a.tt-all { font-weight: 600; color: var(--ink); }
+.team-sched > h2 { margin-bottom: 14px; }
+.ts2-box { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+.ts2-head { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--panel-2); border-bottom: 1px solid var(--line); font: 700 15px var(--display); letter-spacing: .1em; text-transform: uppercase; }
+.ts2-hrec { margin-left: auto; font: 700 16px var(--mono); letter-spacing: .02em; color: var(--muted); }
+.ts2-scroll { overflow-x: auto; }
+.ts2-cols, .ts2-row { display: grid; grid-template-columns: 116px 76px minmax(0, 1fr) minmax(0, 1.1fr) 130px; gap: 14px; align-items: center; padding: 9px 20px; min-width: 760px; }
+.ts2-venue { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.ts2-venue b { font: 600 14px var(--body); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts2-venue span { font: 500 12px var(--body); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.l5s.wk-hover { cursor: pointer; border-radius: 6px; padding: 2px; margin: -2px; }
+.ts2-cols { padding-top: 8px; padding-bottom: 8px; font: 700 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: #7a8aa3; border-bottom: 1px solid var(--line); }
+.ts2-row { border-bottom: 1px solid var(--line); cursor: pointer; }
+.ts2-row:last-child { border-bottom: 0; }
+.ts2-row:hover { background: var(--panel-2); }
+.ts2-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ts2-date { font: 600 14px var(--body); color: #3a4d6a; white-space: nowrap; }
+.ts2-where { font: 600 13px var(--body); color: var(--muted); }
+.ts2-opp { display: flex; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
+.ts2-opp .team-link { font: 600 15px var(--body); color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; }
+.ts2-logo { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 7px; background: #fff; border: 1px solid var(--line); flex: none; }
+.ts2-vs { font: 600 13px var(--body); color: var(--muted); }
+.ts2-rank { font: 700 13px var(--mono); color: var(--gold); }
+.ts2-conf { display: inline-flex; flex: none; }
+.ts2-res { display: inline-flex; align-items: center; gap: 10px; padding: 4px 8px 4px 4px; margin-left: -4px; border-radius: 8px; color: var(--ink); text-decoration: none; }
+.ts2-res:hover { background: var(--chip); }
+.ts2-res b { font: 700 18px var(--mono); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.ts2-res small { font: 600 12px var(--body); color: var(--muted); }
+.ts2-wl { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; font: 700 12px var(--body); color: #fff; }
+.ts2-wl.w { background: #1f6f43; } .ts2-wl.l { background: #b4343a; } .ts2-wl.t { background: #b9c3d3; color: #0b1f3a; }
+@media (max-width: 720px) { .team-hero2, .team-tabs { margin-left: -12px; margin-right: -12px; } .th-top { padding: 20px 14px; } .th-strip { margin: 0 14px; } .th-name { font-size: 36px; } .th-logo { width: 84px; height: 84px; } .th-logo > * { zoom: .68; } }
+.team-tabs .spacer { flex: 1; }
+.ts2-row { cursor: default; }
+.ts2-cols, .ts2-row { grid-template-columns: 110px 70px minmax(0, 1fr) minmax(0, 1fr) 150px; }
+.ts2-opp .ts2-vs { width: 18px; flex: none; }
+.ts2-res b { text-decoration: none; }

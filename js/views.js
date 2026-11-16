@@ -1,13 +1,13 @@
 // Pages: home, champions, schools, a school, the all-sports cup, and data.
 
-import { assetUrl, ctx, app, modal, $, $$, esc, toast, dynasties, allSchools, school, schoolLook, logoImg, confLogo, readableOn, sportTag, rec, confRec, seasonLabel, seasonSpan } from './ui.js?v=20261115173051';
-import { tournamentUrl } from './tournament.js?v=20261115173051';
-import { conferenceUrl } from './conference.js?v=20261115173051';
-import { SPORTS, detectSport, customSport, isDynastyBackup, sportWord, sportFamily } from './sports.js?v=20261115173051';
-import { extractDynasty, EXTRACT_VERSION } from './extract.js?v=20261115173051';
-import { saveHistory, hydrateHistory, mergeDynasty, exportHistory, isHistoryBackup, emptyHistory } from './store.js?v=20261115173051';
-import { cupStandings, cupYears, finishPoints, FINISH_LABEL, CUP_POINTS } from './cup.js?v=20261115173051';
-import { calendarDays, calendarUrl, defaultDay, firstUnplayed, longDate } from './calendar.js?v=20261115173051';
+import { assetUrl, ctx, app, modal, $, $$, esc, toast, dynasties, allSchools, school, schoolLook, logoImg, confLogo, readableOn, sportTag, rec, confRec, seasonLabel, seasonSpan } from './ui.js?v=20261115174328';
+import { tournamentUrl } from './tournament.js?v=20261115174328';
+import { conferenceUrl } from './conference.js?v=20261115174328';
+import { SPORTS, detectSport, customSport, isDynastyBackup, sportWord, sportFamily } from './sports.js?v=20261115174328';
+import { extractDynasty, EXTRACT_VERSION } from './extract.js?v=20261115174328';
+import { saveHistory, hydrateHistory, mergeDynasty, exportHistory, isHistoryBackup, emptyHistory } from './store.js?v=20261115174328';
+import { cupStandings, cupYears, finishPoints, FINISH_LABEL, CUP_POINTS } from './cup.js?v=20261115174328';
+import { calendarDays, calendarUrl, defaultDay, firstUnplayed, longDate } from './calendar.js?v=20261115174328';
 
 // Home's "Across the AAU": the latest day with results and the next day
 // with games to play, each with its sports and counts, linking to the
@@ -200,7 +200,7 @@ export function schoolTotals(name) {
 // A school's home conference: the one it plays in for the most sports in each
 // sport's latest season (ties: alphabetical), with a dynasty that knows the
 // conference's logo. Null for a school with no conference.
-function homeConference(name) {
+export function homeConference(name) {
   const count = {}, where = {};
   for (const d of dynasties()) {
     const ys = Object.keys(d.years).map(Number).filter(y => d.years[y].teams[name]).sort((a, b) => b - a);

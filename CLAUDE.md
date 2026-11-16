@@ -55,10 +55,19 @@ changes here aren't ported there, or theirs here, unless the owner asks.
 - The Schools page shows a badge per school in its colors (A–Z or by home
   conference: the one it plays most sports in, `homeConference`), or the
   stats table.
-- School pages (`js/school.js`) are like a team site: a header in the
-  school's colors, a tab per sport, banners (national titles in gold;
-  regular-season and tournament conference titles with the conference's
-  logo), and per sport a season picker, snapshot, schedule with results,
+- School pages (`js/school.js`) look like the sport apps' team pages
+  (Nov. 2026, the owner's ask): the header (`schoolHero`, the apps'
+  `team-hero2`/`th-*` styles) in the school's colors (`heroColors`) with
+  its logo, kicker, name and mascot, banners (national titles in gold with a
+  trophy, conference titles with the conference's logo) and a numbers strip
+  (all sports: titles, bids, cups, all-time record; one sport: that season's
+  record, conference record and place, final poll, national finish, for and
+  against), then `team-tabs` (all sports, a tab per sport, All schools).
+  All sports: the banner rafters, a card per sport and the Cup; one sport: a
+  season picker, the schedule in the apps' boxes (`ts2-*`: regular season, a
+  box per preseason tournament, conference tournament, national tournament,
+  each with its record; date, home/away/neutral, opponent with the
+  conference logo on conference games, venue and round, W/L/T and score),
   program write-up, season by season and coaches. Schedules come from each
   season's compact `games` (EXTRACT_VERSION 2); dates from each sport's
   calendar (`start` in `js/sports.js`, the same rule as its app).

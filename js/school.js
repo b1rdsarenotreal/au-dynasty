@@ -7,13 +7,13 @@
 //   with results), a short program history, coaches and every season.
 // Routes: #/school/<name>, #/school/<name>/<sport>, #/school/<name>/<sport>/<year>.
 
-import { ctx, app, esc, dynasties, schoolLook, logoImg, confLogo, rec, confRec, seasonLabel, seasonSpan } from './ui.js?v=20261115173051';
-import { tournamentUrl } from './tournament.js?v=20261115173051';
-import { conferenceUrl } from './conference.js?v=20261115173051';
-import { cupStandings, cupYears, FINISH_LABEL } from './cup.js?v=20261115173051';
-import { schoolSeasons, schoolTotals } from './views.js?v=20261115173051';
-import { pct } from './extract.js?v=20261115173051';
-import { appHref, openApp } from './live.js?v=20261115173051';
+import { ctx, app, esc, dynasties, schoolLook, logoImg, confLogo, rec, confRec, seasonLabel, seasonSpan } from './ui.js?v=20261115174328';
+import { tournamentUrl } from './tournament.js?v=20261115174328';
+import { conferenceUrl } from './conference.js?v=20261115174328';
+import { cupStandings, cupYears, FINISH_LABEL } from './cup.js?v=20261115174328';
+import { schoolSeasons, schoolTotals, homeConference } from './views.js?v=20261115174328';
+import { pct } from './extract.js?v=20261115174328';
+import { appHref, openApp } from './live.js?v=20261115174328';
 
 const enc = encodeURIComponent;
 export const schoolUrl = (name, sport, year) => `#/school/${enc(name)}${sport ? `/${enc(sport)}` : ''}${sport && year ? `/${year}` : ''}`;
@@ -105,39 +105,60 @@ export function scoreNote(d, s, g) {
   }
   return note;
 }
-function resultCell(d, s, name, g) {
-  if (g.hr == null) return '<span class="muted">—</span>';
-  const home = g.h === name, us = home ? g.hr : g.ar, them = home ? g.ar : g.hr;
-  let res = us > them ? 'W' : us < them ? 'L' : 'T';
-  let pk = '';
-  if (g.pk) {
-    const [ph, pa] = g.pk, pus = home ? ph : pa, pthem = home ? pa : ph;
-    const so = d.sport.pkWins ? 'SO' : 'PK';
-    if (d.sport.pkWins) res = pus > pthem ? 'W' : 'L';
-    pk = d.sport.pkWins ? ` ${so} ${pus}-${pthem}` : `, ${pus > pthem ? 'won' : 'lost'} ${pus}-${pthem} on PKs`;
-  }
-  const note = scoreNote(d, s, g);
-  return `<span class="res res-${res}">${res}</span> ${us}-${them}${note || pk ? ` <span class="muted small rnote">(${[note, pk.trim()].filter(Boolean).join(', ')})</span>` : ''}`;
-}
 function scheduleHtml(d, y, s, name) {
   const games = (s.games || []).filter(g => g.h === name || g.a === name);
   if (!games.length) return '<p class="muted">No schedule for this season. Upload its backup again to add it (schedules are kept from now on).</p>';
   const rows = games.map(g => ({ g, date: gameDay(d, y, g, s.games) }))
     .sort((a, b) => (a.date && b.date ? a.date - b.date : 0) || a.g.w - b.g.w || DOW.indexOf(a.g.d) - DOW.indexOf(b.g.d) || (a.g.o ?? 0) - (b.g.o ?? 0));
-  const typeName = { conf: 'Conference tournament', regional: 'National tournament', super: 'National tournament', mcws: s.finalsName || 'National finals' };
-  return `<div class="table-wrap"><table class="sched"><thead><tr><th>Date</th><th>Opponent</th><th>Result</th><th class="hide-sm"></th></tr></thead><tbody>
-    ${rows.map(({ g, date }) => {
-      const home = g.h === name, opp = home ? g.a : g.h;
-      const where = g.n ? 'vs.' : home ? 'vs.' : 'at';
-      const place = g.v || (g.hs && g.hs !== name && g.hs !== opp ? g.hs : '') || (g.t === 'mcws' ? s.venue : '');
-      const site = g.n ? `<span class="muted small"> · ${esc(place ? `at ${place}` : 'neutral site')}</span>` : '';
-      const label = g.t ? (g.lb || typeName[g.t] || '') : (g.lb || '');
-      const tag = g.t ? `<span class="sched-tag ${g.t === 'conf' ? 'ct' : 'nt'}">${esc(label)}</span>` : g.c ? '<span class="sched-tag conf">Conference</span>' : label ? `<span class="sched-tag">${esc(label)}</span>` : '';
-      return `<tr class="${g.t ? 'post' : ''}"><td class="nowrap dt">${date ? `<span class="dw">${DAY_NAME[g.d] || g.d}</span> <span class="md">${MON[date.getUTCMonth()]} ${date.getUTCDate()}</span>` : `Week ${g.w} · ${esc(g.d || '')}`}</td>
-        <td><span class="team">${where} ${logoImg(opp, 18)}<a class="team-link" href="${schoolUrl(opp, d.sport.id, y)}">${esc(opp)}</a>${g.c ? '<span class="conf-mark" title="Conference game">*</span>' : ''}</span>${site}<span class="show-sm">${tag}</span></td>
-        <td class="nowrap">${resultCell(d, s, name, g)}</td><td class="hide-sm">${tag}</td></tr>`;
-    }).join('')}
-  </tbody></table></div><p class="small muted">* conference ${d.sport.unit || 'game'}</p>`;
+  // As on the sport apps' team pages: one box for the regular season, one
+  // per preseason tournament, one for the conference tournament and one for
+  // the national tournament, each with its record.
+  const natName = s.finalsName ? 'National tournament' : 'National tournament';
+  const boxOf = g => (g.t === 'conf' ? 'conf' : g.t ? 'nat' : g.lb && g.n ? `t:${g.lb}` : 'reg');
+  const titleOf = k => (k === 'reg' ? 'Regular season' : k === 'conf' ? 'Conference tournament' : k === 'nat' ? natName : k.slice(2));
+  const boxes = [];
+  for (const r of rows) { const k = boxOf(r.g); let b = boxes.find(x => x.k === k); if (!b) boxes.push(b = { k, rows: [] }); b.rows.push(r); }
+  const ord = k => (k.startsWith('t:') ? 0 : k === 'reg' ? 1 : k === 'conf' ? 2 : 3);
+  boxes.sort((a, b) => ord(a.k) - ord(b.k));
+  const conf = s.teams[name]?.conf;
+  const recOf = list => {
+    const r = { w: 0, l: 0, t: 0, cw: 0, cl: 0, ct: 0 };
+    for (const { g } of list) {
+      const res = resultOf(d, name, g);
+      if (!res) continue;
+      r[res.toLowerCase()]++;
+      if (g.c && !g.t) r['c' + res.toLowerCase()]++;
+    }
+    return r;
+  };
+  const row = ({ g, date }) => {
+    const home = g.h === name, opp = home ? g.a : g.h, res = resultOf(d, name, g);
+    const where = g.n ? 'Neutral' : home ? 'Home' : 'Away';
+    const place = g.v || (g.n && g.hs && g.hs !== name && g.hs !== opp ? g.hs : '') || (g.t === 'mcws' ? s.venue : '');
+    const round = g.t ? (g.lb || '') : '';
+    const oc = g.c ? (s.teams[opp]?.conf || conf) : null;
+    const score = g.hr == null ? '' : `${home ? g.hr : g.ar}-${home ? g.ar : g.hr}`;
+    const note = [g.hr != null ? scoreNote(d, s, g) : '', g.pk ? `${d.sport.pkWins ? 'SO' : 'PK'} ${home ? g.pk[0] : g.pk[1]}-${home ? g.pk[1] : g.pk[0]}` : ''].filter(Boolean).join(', ');
+    return `<div class="ts2-row"><span class="ts2-date">${date ? `${DAY_NAME[g.d] || g.d} ${MON[date.getUTCMonth()]} ${date.getUTCDate()}` : `Week ${g.w}`}</span><span class="ts2-where">${where}</span>
+      <span class="ts2-opp"><span class="ts2-vs">${g.n || home ? 'vs' : 'at'}</span><span class="ts2-logo">${logoImg(opp, 26)}</span><a class="team-link" href="${schoolUrl(opp, d.sport.id, y)}">${esc(opp)}</a>${oc && !g.t ? `<span class="ts2-conf" title="${esc(oc)} ${esc(d.sport.unit || 'game')}">${confLogo(d, oc, 20)}</span>` : ''}</span>
+      <span class="ts2-venue">${place ? `<b>${esc(place)}</b>` : ''}${round ? `<span>${esc(round)}</span>` : ''}</span>
+      <span class="ts2-res">${res ? `<span class="ts2-wl ${res.toLowerCase()}">${res}</span><b>${score}</b>${note ? `<small>${esc(note)}</small>` : ''}` : '<span class="muted">—</span>'}</span></div>`;
+  };
+  return boxes.map(b => {
+    const r = recOf(b.rows), played = r.w + r.l + r.t;
+    const hrec = played ? `${rec(r)}${b.k === 'reg' && r.cw + r.cl + r.ct ? ` · ${esc(d.conferences?.[conf]?.abbr || 'Conf')} ${confRec(r)}` : ''}` : '';
+    return `<div class="ts2-box"><div class="ts2-head">${esc(titleOf(b.k))}${hrec ? `<span class="ts2-hrec">${hrec}</span>` : ''}</div>
+      <div class="ts2-scroll"><div class="ts2-cols"><span>Date</span><span>Where</span><span>Opponent</span><span>Venue</span><span>Result</span></div>${b.rows.map(row).join('')}</div></div>`;
+  }).join('');
+}
+// W, L or T for a school in a played game (a shootout decides it where the
+// sport counts it, field hockey; a soccer shootout leaves a tie).
+function resultOf(d, name, g) {
+  if (g.hr == null) return null;
+  const home = g.h === name, us = home ? g.hr : g.ar, them = home ? g.ar : g.hr;
+  if (us !== them) return us > them ? 'W' : 'L';
+  if (g.pk && d.sport.pkWins) { const [ph, pa] = g.pk; return (home ? ph > pa : pa > ph) ? 'W' : 'L'; }
+  return 'T';
 }
 
 // ---------- one sport ----------
@@ -206,16 +227,9 @@ function renderSport(name, d, yearArg) {
   return `
     <div class="card">
       <div class="row season-head"><h2 style="margin:0">${seasonLabel(y)} ${esc(d.sport.name)}</h2>${s.complete ? '' : '<span class="badge">In progress</span>'}<span class="spacer"></span>
-        ${appHref(d.sport.id) && (ctx.live || []).some(x => x.sport.id === d.sport.id) ? `<a class="btn sm" href="${esc(appHref(d.sport.id, `#/team/${encodeURIComponent(name)}`))}" data-open="${esc(d.sport.id)}" title="This team in the ${esc(d.sport.name)} app">Open in the app ›</a>` : ''}
         <label class="small muted">Season <select id="sch-year">${[...years].reverse().map(v => `<option value="${v}" ${v === y ? 'selected' : ''}>${seasonLabel(v)}</option>`).join('')}</select></label></div>
-      <div class="snaps">
-        ${snap(rec(t), 'Overall')}
-        ${t.cw + t.cl + t.ct ? snap(confRec(t), `${t.conf ? `<a href="${conferenceUrl(t.conf, d.sport.id, y)}" title="${esc(t.conf)}">${confLogo(d, t.conf, 14)} Conference</a>` : 'Conference'}${place ? ` · ${place}` : ''}`) : ''}
-        ${snap(t.rank ? `#${t.rank}` : 'NR', 'Final ranking')}
-        ${snap(esc(t.coach || '—'), 'Coach')}
-      </div>
       <p class="season-line">${s.complete || t.finish ? esc(finishLine(d, s, t)).replace('🏆', '🏆') : 'Season in progress'}${t.finish && s.nt ? ` · <a href="${tournamentUrl(d.sport.id, Object.keys(d.years).find(k => d.years[k] === s))}">Bracket →</a>` : ''}${titles.length ? ` · <b>${titles.join(' · ')}</b>` : ''}</p>
-      <h3>Schedule and results</h3>
+      <h3>Schedule &amp; results</h3>
       ${scheduleHtml(d, y, s, name)}
     </div>
     <div class="card"><h2>${esc(d.sport.name)} banners</h2>${rafters(name, bannersOf(name, d.sport.id), false, 'No banners in this sport yet.')}</div>
@@ -230,6 +244,47 @@ function renderSport(name, d, yearArg) {
     </tbody></table></div></div>`;
 }
 
+// ---------- the header, like the sport apps' team pages ----------
+
+const TROPHY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9 17h6"/></svg>';
+// The school's color behind the header (its second color when the first is
+// white or black), the text on it, and an accent (its other color when that
+// reads on it).
+function heroColors(name) {
+  const look = schoolLook(name), ok = c => /^#[0-9a-f]{6}$/i.test(c || '');
+  const bg = ok(look.color) && !['#ffffff', '#000000'].includes(look.color.toLowerCase()) ? look.color : ok(look.altColor) && look.altColor.toLowerCase() !== '#ffffff' ? look.altColor : '#0b1f3a';
+  const ink = readableOn(bg), alt = bg === look.color ? look.altColor : look.color;
+  const contrast = (a, b) => Math.abs(lum(a) - lum(b));
+  const acc = ok(alt) && contrast(alt, bg) > 0.35 ? alt : ink === '#111' ? '#3a3a3a' : '#f6efd9';
+  return { bg, ink, acc };
+}
+// A banner in the header: national titles in gold with a trophy, conference
+// titles with the conference's logo. `withSport` names the sport (all-sports view).
+function heroBanner(b, name, withSport) {
+  const sp = withSport ? `${esc(b.d.sport.short || b.d.sport.name)} · ` : '';
+  if (b.kind === 'national') return `<a class="th-banner gold" href="${tournamentUrl(b.d.sport.id, b.y)}">${TROPHY}<b>${esc(seasonLabel(b.y))}</b><span>${sp}National champions</span></a>`;
+  const abbr = b.d.conferences?.[b.conf]?.abbr || b.conf;
+  return `<a class="th-banner" href="${conferenceUrl(b.conf, b.d.sport.id, b.y)}">${confLogo(b.d, b.conf, 24)}<b>${esc(seasonLabel(b.y))}</b><span>${sp}${esc(abbr)} ${b.kind === 'tourney' ? 'tournament' : 'champions'}</span></a>`;
+}
+function schoolHero(name, { kick = '', rank = null, sub = '', banners = [], stats = [], withSport = false }) {
+  const look = schoolLook(name), { bg, ink, acc } = heroColors(name);
+  const stat = ([v, l]) => `<div class="th-stat"><b>${v}</b><span>${l}</span></div>`;
+  return `<section class="team-hero2" style="--tb:${esc(bg)};--ti:${ink};--ta:${esc(acc)}">
+    <div class="th-top">
+      <div class="th-logo">${logoImg(name, 96)}</div>
+      <div class="th-main">
+        ${kick ? `<span class="th-kick">${kick}</span>` : ''}
+        <h1 class="th-name">${rank ? `<span class="th-rank">${rank}</span>` : ''}${esc(name)}${look.mascot ? ` <span class="th-mascot">${esc(look.mascot)}</span>` : ''}</h1>
+        ${sub ? `<span class="th-sub">${sub}</span>` : ''}
+      </div>
+      ${banners.length ? `<div class="th-banners">${banners.slice(0, 4).map(b => heroBanner(b, name, withSport)).join('')}</div>` : ''}
+    </div>
+    ${stats.length ? `<div class="th-strip">${stats.map(stat).join('')}</div>` : ''}
+  </section>`;
+}
+const FINISH_SHORT = { champion: 'Champions', 'runner-up': 'Runner-up', finals: 'Finals', super: 'Super regional', field: 'In the field' };
+const forAgainst = sport => (/volleyball/.test(sport.id) ? 'Sets won–lost' : /basketball/.test(sport.id) ? 'Points for–against' : sport.innings ? 'Runs for–against' : 'Goals for–against');
+
 // ---------- all sports ----------
 
 function renderAll(name, sportOrder, bySport) {
@@ -237,7 +292,6 @@ function renderAll(name, sportOrder, bySport) {
   const cupRows = cupYears(ctx.history).map(y => { const c = cupStandings(ctx.history, y); const i = c.schools.findIndex(s => s.school === name); return i < 0 ? null : { y, rank: i + 1, ...c.schools[i], of: c.schools.length }; }).filter(Boolean).reverse();
   const kpi = (v, l) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`;
   return `
-    <div class="kpis">${kpi(x.titles, 'National titles')}${kpi(x.reg, 'Conference titles')}${kpi(x.tour, 'Conference tournament titles')}${kpi(x.bids, 'National tournaments')}${kpi(x.cups, 'All-Sports Cups')}${kpi(rec(x), 'All-time, every sport')}</div>
     <div class="card"><h2>Banners</h2>${rafters(name, bannersOf(name), true, 'No banners yet: national titles and conference titles hang here.')}</div>
     <div class="sport-cards">${sportOrder.map(id => {
       const { d, rows } = bySport[id], last = rows[rows.length - 1];
@@ -257,19 +311,36 @@ export function renderSchool(parts) {
   const [name, sportId, year] = parts;
   const rows = schoolSeasons(name);
   if (!rows.length) { app.innerHTML = `<div class="empty">No history for ${esc(name)} yet. <a href="#/schools">All schools</a></div>`; return; }
-  const look = schoolLook(name), { c1, c2, ink } = colorsOf(name);
   const bySport = {};
   for (const r of rows) (bySport[r.d.sport.id] ||= { d: r.d, rows: [] }).rows.push(r);
   for (const v of Object.values(bySport)) v.rows.sort((a, b) => a.y - b.y);
   const sportOrder = dynasties().map(d => d.sport.id).filter(id => bySport[id]);
   const active = bySport[sportId] ? sportId : null;
-  const nTitles = bannersOf(name).filter(b => b.kind === 'national').length;
-  app.innerHTML = `
-    <div class="sch-hero" style="--c1:${c1};--c2:${c2};--hi:${ink}">
-      <div class="sch-logo">${logoImg(name, 76)}</div>
-      <div class="sch-id"><h1>${esc(name)}</h1><div class="sch-sub">${esc(look.mascot || '')}${look.mascot ? ' · ' : ''}${sportOrder.length} sport${sportOrder.length > 1 ? 's' : ''}${nTitles ? ` · ${nTitles} national title${nTitles > 1 ? 's' : ''}` : ''}</div></div>
-    </div>
-    <nav class="sch-tabs" style="--c1:${c1}"><a href="${schoolUrl(name)}" class="${active ? '' : 'active'}">All sports</a>${sportOrder.map(id => `<a href="${schoolUrl(name, id)}" class="${id === active ? 'active' : ''}">${esc(bySport[id].d.sport.name)}</a>`).join('')}</nav>
+  const tabs = `<nav class="team-tabs" style="--tc:${esc(heroColors(name).bg)}"><a href="${schoolUrl(name)}" class="${active ? '' : 'active'}">All sports</a>${sportOrder.map(id => `<a href="${schoolUrl(name, id)}" class="${id === active ? 'active' : ''}">${esc(bySport[id].d.sport.name)}</a>`).join('')}<span class="spacer"></span><a class="tt-all" href="#/schools">All schools</a></nav>`;
+  let hero;
+  if (active) {
+    const { d, rows: sr } = bySport[active];
+    const years = sr.map(r => r.y), y = years.includes(+year) ? +year : years[years.length - 1];
+    const { s, t } = sr.find(r => r.y === y), place = confPlace(d, s, name);
+    const live = appHref(d.sport.id) && (ctx.live || []).some(x => x.sport.id === d.sport.id);
+    hero = schoolHero(name, {
+      kick: `${t.conf ? `<a href="${conferenceUrl(t.conf, d.sport.id, y)}">${esc(t.conf)}</a> · ` : ''}${esc(d.sport.name)} · ${esc(seasonLabel(y))}`,
+      rank: t.rank || null,
+      sub: `${t.coach ? `Head coach ${esc(t.coach)}` : ''}${live ? `${t.coach ? ' · ' : ''}<a href="${esc(appHref(d.sport.id, `#/team/${encodeURIComponent(name)}`))}" data-open="${esc(d.sport.id)}">Open in the ${esc(d.sport.name)} app ›</a>` : ''}`,
+      banners: bannersOf(name, d.sport.id),
+      stats: [[rec(t), 'Overall'], ...(t.cw + t.cl + t.ct ? [[confRec(t), `${esc(d.conferences?.[t.conf]?.abbr || 'Conf')}${place ? ` · ${place}` : ''}`]] : []), [t.rank ? `No. ${t.rank}` : 'NR', 'Final poll'],
+        [t.finish ? esc(FINISH_SHORT[t.finish] || '') : s.complete ? '—' : '…', t.seed ? `National · ${t.seed} seed` : 'National tournament'], [`${t.gf ?? 0}–${t.ga ?? 0}`, forAgainst(d.sport)]],
+    });
+  } else {
+    const x = schoolTotals(name), home = homeConference(name);
+    hero = schoolHero(name, {
+      kick: `${home?.conf ? `<a href="${conferenceUrl(home.conf)}">${esc(home.conf)}</a> · ` : ''}${sportOrder.length} sport${sportOrder.length > 1 ? 's' : ''}`,
+      sub: sportOrder.map(id => esc(bySport[id].d.sport.short || bySport[id].d.sport.name)).join(' · '),
+      banners: bannersOf(name).filter(b => b.kind === 'national').sort((a, b) => b.y - a.y), withSport: true,
+      stats: [[x.titles, 'National titles'], [x.reg, 'Conference titles'], [x.tour, 'Conf. tournaments'], [x.bids, 'National tournaments'], [x.cups, 'All-Sports Cups'], [rec(x), 'All-time']],
+    });
+  }
+  app.innerHTML = `${hero}${tabs}
     ${active ? renderSport(name, bySport[active].d, year) : renderAll(name, sportOrder, bySport)}`;
   document.querySelectorAll('[data-open]').forEach(el => (el.onclick = () => openApp(el.dataset.open)));
   const sel = document.getElementById('sch-year');
