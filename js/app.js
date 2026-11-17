@@ -1,21 +1,22 @@
 // App shell: loading the record book and the apps' saves, the top bar and
 // page routing.
 
-import { loadHistory, repairHistory, saveHistory, mergeDynasty } from './store.js?v=20261116223240';
-import { loadLive } from './live.js?v=20261116223240';
-import { extractDynasty } from './extract.js?v=20261116223240';
-import { renderCalendar } from './calendar.js?v=20261116223240';
-import { renderSports } from './sports-page.js?v=20261116223240';
-import { loadLogoTable } from './logos.js?v=20261116223240';
-import { renderSchool } from './school.js?v=20261116223240';
-import { renderTournament } from './tournament.js?v=20261116223240';
-import { renderConference, renderConferences } from './conference.js?v=20261116223240';
-import { ctx, app, esc } from './ui.js?v=20261116223240';
-import { renderHome, renderChampions, renderSchools, renderCup, renderData } from './views.js?v=20261116223240';
+import { loadHistory, repairHistory, saveHistory, mergeDynasty } from './store.js?v=20261117005238';
+import { loadLive } from './live.js?v=20261117005238';
+import { extractDynasty } from './extract.js?v=20261117005238';
+import { renderCalendar } from './calendar.js?v=20261117005238';
+import { renderSports } from './sports-page.js?v=20261117005238';
+import { renderRealign } from './realign.js?v=20261117005238';
+import { loadLogoTable } from './logos.js?v=20261117005238';
+import { renderSchool } from './school.js?v=20261117005238';
+import { renderTournament } from './tournament.js?v=20261117005238';
+import { renderConference, renderConferences } from './conference.js?v=20261117005238';
+import { ctx, app, esc } from './ui.js?v=20261117005238';
+import { renderHome, renderChampions, renderSchools, renderCup, renderData } from './views.js?v=20261117005238';
 
-const VIEWS = { home: 'Home', calendar: 'Calendar', sports: 'Sports', champions: 'Champions', tournament: 'Tournaments', schools: 'Schools', conferences: 'Conferences', cup: 'All-Sports Cup', data: 'Data' };
+const VIEWS = { home: 'Home', calendar: 'Calendar', sports: 'Sports', champions: 'Champions', tournament: 'Tournaments', schools: 'Schools', conferences: 'Conferences', realign: 'Realignment', cup: 'All-Sports Cup', data: 'Data' };
 const SUBVIEWS = { school: 'schools', conference: 'conferences' };
-const RENDER = { calendar: () => renderCalendar(routeParts()), sports: renderSports, home: renderHome, champions: renderChampions, schools: renderSchools, school: () => renderSchool(routeParts()), tournament: () => renderTournament(routeParts()), conferences: renderConferences, conference: () => renderConference(routeParts()), cup: renderCup, data: renderData };
+const RENDER = { calendar: () => renderCalendar(routeParts()), sports: renderSports, home: renderHome, champions: renderChampions, schools: renderSchools, school: () => renderSchool(routeParts()), tournament: () => renderTournament(routeParts()), conferences: renderConferences, conference: () => renderConference(routeParts()), cup: renderCup, realign: renderRealign, data: renderData };
 
 function currentView() { const v = location.hash.replace(/^#\/?/, '').split('/')[0]; return VIEWS[v] || SUBVIEWS[v] ? v : 'home'; }
 // The route's parts after the page name, each decoded (a school name may hold any character).

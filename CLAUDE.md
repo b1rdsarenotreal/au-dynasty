@@ -35,6 +35,18 @@ changes here aren't ported there, or theirs here, unless the owner asks.
   page (`js/sports-page.js`) has a card per sport: season, phase, games
   played, the poll's No. 1 or the champion, the latest results day, and
   links into the app.
+- Realignment (`js/realign.js`, `#/realign`, the owner's ask, Nov. 2026):
+  the AAU's all-sports conferences as a board, from the apps' current
+  alignment (each school's conference by majority across the saves, else
+  `js/directory.js`). Drag schools between conferences or use a school's
+  Move menu, bring schools in from "Not in the AAU", add conferences.
+  Saving writes the plan to localStorage `aau-realignment` (the one thing
+  the hub writes for the apps: every school's conference, the conferences'
+  looks, `joins`, `left`); each app offers it on its Offseason page and
+  marks it `league.realign[planId]` applied or skipped, which the page
+  shows. `js/directory.js` (schools, logos, conferences) is generated from
+  AAU Soccer's lists by `node tools/gen_directory.mjs`; regenerate when
+  schools are added there.
 - The record book keeps its own database, `aau-dynasty`; on the first visit
   it starts from AAU History's (`aau-history`) if this browser has one.
 

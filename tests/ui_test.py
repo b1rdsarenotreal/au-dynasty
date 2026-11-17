@@ -5,7 +5,7 @@ visits every page, checks the champions, a school page and the cup, restores
 from a history backup, and checks that nothing errors and phones don't
 scroll sideways.
 """
-import http.server, socketserver, threading, sys, functools, pathlib, gzip, tempfile, json
+import json, http.server, socketserver, threading, sys, functools, pathlib, gzip, tempfile, json
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -163,8 +163,23 @@ with sync_playwright() as p:
     names = pg.evaluate("indexedDB.databases().then(l => l.map(d => d.name))")
     assert "aau-soccer" not in names and "aau-diamond" not in names, names
 
+    # Realignment: a conference added, a school dragged in from the tray and
+    # one moved with its menu, then saved for the apps.
+    pg.goto(U + "#/realign"); pg.reload(); pg.wait_for_selector(".ra-conf", timeout=15000)
+    pg.click("#ra-newconf"); pg.click('[data-conf="Greater South Conference"]')
+    pg.evaluate('''() => { const dt = new DataTransfer(), src = document.querySelector('.ra-tray [data-school="Saint Louis"]'), dst = document.querySelector('[data-drop="Greater South Conference"]');
+      src.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true })); dst.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); }''')
+    pg.select_option('[data-move="Kansas"]', "Greater South Conference")
+    gsc = pg.eval_on_selector_all('[data-drop="Greater South Conference"] .ra-chip', "els => els.map(e => e.dataset.school)")
+    assert gsc == ["Kansas", "Saint Louis"], gsc
+    pg.click("#ra-save")
+    plan = json.loads(pg.evaluate("localStorage.getItem('aau-realignment')"))
+    assert plan["schools"]["Saint Louis"] == "Greater South Conference" and "Saint Louis" in plan["joins"], plan["joins"]
+    assert plan["conferences"]["Greater South Conference"]["logo"] == "img/conf/gsc.svg"
+    assert "In the sports apps" in pg.locator("#app").inner_text()
+
     pg.set_viewport_size({"width": 390, "height": 800})
-    for h in ["#/home", "#/calendar", "#/sports", "#/champions", "#/schools", "#/cup", f"#/school/{champ}"]:
+    for h in ["#/home", "#/calendar", "#/sports", "#/champions", "#/schools", "#/cup", "#/realign", f"#/school/{champ}"]:
         visit(pg, h)
         assert not pg.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1"), f"{h} scrolls sideways on a phone"
     shot(pg, "h-mobile")

@@ -6,7 +6,7 @@
 // side, with a localStorage copy as a fallback). The hub reads them on load,
 // never writes to them, and never creates a database an app hasn't made.
 
-import { SPORTS } from './sports.js?v=20261116223240';
+import { SPORTS } from './sports.js?v=20261117005238';
 
 // app: folder on the site; sideKey/side: the app's women's/men's switch
 // (localStorage), set before opening an app so it shows the right side.
