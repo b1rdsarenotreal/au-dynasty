@@ -1,7 +1,7 @@
 // Shared page pieces: the history, logos, school labels, sport labels.
 
-import { logoFor } from './logos.js?v=20261116184339';
-import { SPORTS } from './sports.js?v=20261116184339';
+import { logoFor } from './logos.js?v=20261116215134';
+import { SPORTS } from './sports.js?v=20261116215134';
 
 // Logo files in this app (img/conf/) carry this release's version, like the
 // scripts do, so a redrawn logo shows right away instead of a cached copy.

@@ -7,10 +7,10 @@
 // the apps' saves read on this visit (`ctx.upcoming`). Dates follow each
 // sport's own calendar (`gameDay`, the same rule as its app).
 
-import { ctx, app, $$, esc, dynasties, logoImg, confLogo, seasonLabel } from './ui.js?v=20261116184339';
-import { gameDay, scoreNote, schoolUrl } from './school.js?v=20261116184339';
-import { appHref, openApp } from './live.js?v=20261116184339';
-import { SPORTS } from './sports.js?v=20261116184339';
+import { ctx, app, $$, esc, dynasties, logoImg, confLogo, seasonLabel } from './ui.js?v=20261116215134';
+import { gameDay, scoreNote, schoolUrl } from './school.js?v=20261116215134';
+import { appHref, openApp } from './live.js?v=20261116215134';
+import { SPORTS } from './sports.js?v=20261116215134';
 
 const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
