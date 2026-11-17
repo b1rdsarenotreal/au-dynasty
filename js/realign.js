@@ -1,22 +1,62 @@
 // Realignment (#/realign): the AAU's conferences as a board. Drag schools
 // between conferences, bring schools into the AAU from the directory, add
-// conferences. Saving leaves the plan in this browser (localStorage
+// conferences. Saving leaves the plan in this browser (IndexedDB
 // `aau-realignment`, the one thing the hub writes for the apps); each sport's
 // app offers it in its next offseason, where the commissioner reviews and
 // applies it (or skips it for that sport). The apps mark a plan applied or
 // skipped in their own save (`league.realign[planId]`), which this page reads.
 
-import { ctx, app, modal, $, $$, esc, toast, readableOn, schoolLook, assetUrl } from './ui.js?v=20261117005238';
-import { logoFor } from './logos.js?v=20261117005238';
-import { DIRECTORY_SCHOOLS, DIRECTORY_CONFERENCES } from './directory.js?v=20261117005238';
-import { openApp, appHref } from './live.js?v=20261117005238';
+import { ctx, app, modal, $, $$, esc, toast, readableOn, schoolLook, assetUrl } from './ui.js?v=20261117010429';
+import { logoFor } from './logos.js?v=20261117010429';
+import { DIRECTORY_SCHOOLS, DIRECTORY_CONFERENCES } from './directory.js?v=20261117010429';
+import { openApp, appHref } from './live.js?v=20261117010429';
 
 export const REALIGN_KEY = 'aau-realignment';
 const OUT = '__out__'; // the "Not in the AAU" tray
 
-export function readPlan() { try { return JSON.parse(localStorage.getItem(REALIGN_KEY) || 'null'); } catch { return null; } }
-function writePlan(plan) { try { localStorage.setItem(REALIGN_KEY, JSON.stringify(plan)); return true; } catch { return false; } }
-function clearPlan() { try { localStorage.removeItem(REALIGN_KEY); } catch { /* ignore */ } }
+// The plan lives in its own small IndexedDB database (`aau-realignment`,
+// store 'kv', key 'plan'), shared by every app on the site. localStorage is
+// only a fallback: the site's localStorage is shared by all the apps and is
+// often full (each caches its logo list there), which is why saving there
+// failed (Nov. 2026).
+const DB = 'aau-realignment';
+function idb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('kv');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbDo(mode, fn) {
+  const db = await idb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const t = db.transaction('kv', mode), r = fn(t.objectStore('kv'));
+      t.oncomplete = () => resolve(r?.result); t.onerror = () => reject(t.error); t.onabort = () => reject(t.error);
+    });
+  } finally { db.close(); }
+}
+let planCache; // undefined until read
+export function readPlan() { return planCache || null; }
+export async function loadPlan() {
+  let p = null;
+  try { p = await idbDo('readonly', st => st.get('plan')); } catch { /* fall back */ }
+  if (!p) try { p = JSON.parse(localStorage.getItem(REALIGN_KEY) || 'null'); } catch { p = null; }
+  return (planCache = p || null);
+}
+async function writePlan(plan) {
+  let ok = false;
+  try { await idbDo('readwrite', st => st.put(plan, 'plan')); ok = true; } catch (e) { console.warn('saving the plan failed', e); }
+  try { localStorage.setItem(REALIGN_KEY, JSON.stringify(plan)); ok = true; } catch { /* full: the database copy is enough */ }
+  if (ok) planCache = plan;
+  return ok;
+}
+async function clearPlan() {
+  try { await idbDo('readwrite', st => st.delete('plan')); } catch { /* ignore */ }
+  try { localStorage.removeItem(REALIGN_KEY); } catch { /* ignore */ }
+  planCache = null;
+}
 
 const CONF_LINKS = {
   bigten: 'https://content.sportslogos.net/logos/153/4661/full/big_ten_conference_logo_primary_20115933.png',
@@ -92,6 +132,7 @@ function changes() {
 const sortS = list => [...list].sort((a, b) => a.localeCompare(b));
 
 export function renderRealign() {
+  if (planCache === undefined) { app.innerHTML = '<div class="empty">Loading…</div>'; loadPlan().then(() => renderRealign()); return; }
   // The saves are read after the first draw: start again from them unless
   // the board has been edited.
   if (!state || (!state.edited && state.stamp !== (ctx.liveStamp || 0))) startState();
@@ -175,7 +216,7 @@ function bind() {
   if (q) q.oninput = () => { ctx.raQuery = q.value; const pos = q.selectionStart; renderRealign(); const nq = $('#ra-q'); nq.focus(); nq.setSelectionRange(pos, pos); };
   $('#ra-newconf').onclick = newConferenceModal;
   $('#ra-reset').onclick = () => { if (!confirm('Go back to the current alignment? Unsaved changes are lost.')) return; state.schools = { ...state.base.schools }; state.conferences = { ...state.base.conferences }; state.edited = true; renderRealign(); };
-  if ($('#ra-withdraw')) $('#ra-withdraw').onclick = () => { if (!confirm('Withdraw the saved plan? Sports that already applied it keep their changes; the others won\'t see it.')) return; clearPlan(); startState(); renderRealign(); toast('Plan withdrawn.'); };
+  if ($('#ra-withdraw')) $('#ra-withdraw').onclick = () => { if (!confirm('Withdraw the saved plan? Sports that already applied it keep their changes; the others won\'t see it.')) return; clearPlan().then(() => { startState(); renderRealign(); toast('Plan withdrawn.'); }); };
   $('#ra-save').onclick = save;
 }
 
@@ -186,9 +227,11 @@ function save() {
   const info = {};
   for (const s of ch.joins.map(x => x[0])) { const d = DIRECTORY_SCHOOLS[s]; if (d) info[s] = { abbr: d.abbr, mascot: d.mascot, color: d.color, altColor: d.altColor, city: d.city, logo: d.logo || null }; }
   const plan = { id: `r${Date.now().toString(36)}`, saved: new Date().toISOString(), schools: { ...state.schools }, conferences, joins: ch.joins.map(x => x[0]), left: ch.leaves, info };
-  if (!writePlan(plan)) return toast('Could not save the plan in this browser.', true);
-  state.savedId = plan.id; renderRealign();
-  toast('Saved. Each sport\'s app offers it in its next offseason.');
+  writePlan(plan).then(ok => {
+    if (!ok) return toast('Could not save the plan in this browser.', true);
+    state.savedId = plan.id; renderRealign();
+    toast('Saved. Each sport\'s app offers it in its next offseason.');
+  });
 }
 
 function addSchoolModal(conf) {

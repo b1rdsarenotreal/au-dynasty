@@ -172,8 +172,9 @@ with sync_playwright() as p:
     pg.select_option('[data-move="Kansas"]', "Greater South Conference")
     gsc = pg.eval_on_selector_all('[data-drop="Greater South Conference"] .ra-chip', "els => els.map(e => e.dataset.school)")
     assert gsc == ["Kansas", "Saint Louis"], gsc
-    pg.click("#ra-save")
-    plan = json.loads(pg.evaluate("localStorage.getItem('aau-realignment')"))
+    pg.click("#ra-save"); pg.wait_for_selector("text=In the sports apps")
+    # Kept in its own database (the site's localStorage may be full).
+    plan = pg.evaluate("new Promise(res => { const r = indexedDB.open('aau-realignment'); r.onsuccess = () => { const g = r.result.transaction('kv').objectStore('kv').get('plan'); g.onsuccess = () => res(g.result); }; })")
     assert plan["schools"]["Saint Louis"] == "Greater South Conference" and "Saint Louis" in plan["joins"], plan["joins"]
     assert plan["conferences"]["Greater South Conference"]["logo"] == "img/conf/gsc.svg"
     assert "In the sports apps" in pg.locator("#app").inner_text()

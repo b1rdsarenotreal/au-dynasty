@@ -40,8 +40,10 @@ changes here aren't ported there, or theirs here, unless the owner asks.
   alignment (each school's conference by majority across the saves, else
   `js/directory.js`). Drag schools between conferences or use a school's
   Move menu, bring schools in from "Not in the AAU", add conferences.
-  Saving writes the plan to localStorage `aau-realignment` (the one thing
-  the hub writes for the apps: every school's conference, the conferences'
+  Saving writes the plan to its own IndexedDB database `aau-realignment`
+  (store 'kv', key 'plan'; a localStorage copy only if there's room, since
+  the site's shared localStorage fills up with the apps' logo caches; the
+  one thing the hub writes for the apps: every school's conference, the conferences'
   looks, `joins`, `left`); each app offers it on its Offseason page and
   marks it `league.realign[planId]` applied or skipped, which the page
   shows. `js/directory.js` (schools, logos, conferences) is generated from
