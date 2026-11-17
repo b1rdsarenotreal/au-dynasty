@@ -1,13 +1,13 @@
 // Pages: home, champions, schools, a school, the all-sports cup, and data.
 
-import { assetUrl, ctx, app, modal, $, $$, esc, toast, dynasties, allSchools, school, schoolLook, logoImg, confLogo, readableOn, sportTag, rec, confRec, seasonLabel, seasonSpan } from './ui.js?v=20261115174328';
-import { tournamentUrl } from './tournament.js?v=20261115174328';
-import { conferenceUrl } from './conference.js?v=20261115174328';
-import { SPORTS, detectSport, customSport, isDynastyBackup, sportWord, sportFamily } from './sports.js?v=20261115174328';
-import { extractDynasty, EXTRACT_VERSION } from './extract.js?v=20261115174328';
-import { saveHistory, hydrateHistory, mergeDynasty, exportHistory, isHistoryBackup, emptyHistory } from './store.js?v=20261115174328';
-import { cupStandings, cupYears, finishPoints, FINISH_LABEL, CUP_POINTS } from './cup.js?v=20261115174328';
-import { calendarDays, calendarUrl, defaultDay, firstUnplayed, longDate } from './calendar.js?v=20261115174328';
+import { assetUrl, ctx, app, modal, $, $$, esc, toast, dynasties, allSchools, school, schoolLook, logoImg, confLogo, readableOn, sportTag, rec, confRec, seasonLabel, seasonSpan } from './ui.js?v=20261116184339';
+import { tournamentUrl } from './tournament.js?v=20261116184339';
+import { conferenceUrl } from './conference.js?v=20261116184339';
+import { SPORTS, detectSport, customSport, isDynastyBackup, sportWord, sportFamily } from './sports.js?v=20261116184339';
+import { extractDynasty, EXTRACT_VERSION } from './extract.js?v=20261116184339';
+import { saveHistory, hydrateHistory, mergeDynasty, exportHistory, isHistoryBackup, emptyHistory } from './store.js?v=20261116184339';
+import { cupStandings, cupYears, finishPoints, FINISH_LABEL, CUP_POINTS } from './cup.js?v=20261116184339';
+import { calendarDays, calendarUrl, defaultDay, firstUnplayed, longDate } from './calendar.js?v=20261116184339';
 
 // Home's "Across the AAU": the latest day with results and the next day
 // with games to play, each with its sports and counts, linking to the
