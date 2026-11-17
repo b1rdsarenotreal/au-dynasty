@@ -3,7 +3,7 @@
 // backup again replaces that sport's seasons with the new ones and keeps any
 // older seasons the new file no longer has. Download/Restore move it.
 
-import { SPORTS, sportWord, sportFamily } from './sports.js?v=20261116215134';
+import { SPORTS, sportWord, sportFamily } from './sports.js?v=20261116222145';
 // Its own database: AAU History (the older record book, on the same site)
 // keeps 'aau-history', which the hub copies once on its first visit.
 const DB = 'aau-dynasty', STORE = 'kv', KEY = 'aau-dynasty';
