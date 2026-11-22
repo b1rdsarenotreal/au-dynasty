@@ -6,11 +6,12 @@
 // side, with a localStorage copy as a fallback). The hub reads them on load,
 // never writes to them, and never creates a database an app hasn't made.
 
-import { SPORTS } from './sports.js?v=20261117010429';
+import { SPORTS } from './sports.js?v=20261122125745';
 
 // app: folder on the site; sideKey/side: the app's women's/men's switch
 // (localStorage), set before opening an app so it shows the right side.
 export const APPS = [
+  { app: 'aau-football', name: 'Football', db: 'aau-football', sideKey: null, saves: [['aau-football-league', 'football', 'men']] },
   { app: 'aau-volleyball', name: 'Volleyball', db: 'aau-volleyball', sideKey: 'aau-volleyball-side', saves: [['aau-volleyball-league', 'w-volleyball', 'women'], ['aau-volleyball-league-men', 'm-volleyball', 'men']] },
   { app: 'aau-soccer', name: 'Soccer', db: 'aau-soccer', sideKey: 'aau-soccer-side', saves: [['aau-soccer-league', 'w-soccer', 'women'], ['aau-soccer-league-men', 'm-soccer', 'men']] },
   { app: 'aau-fhockey', name: 'Field Hockey', db: 'aau-fhockey', sideKey: null, saves: [['aau-fhockey-league', 'field-hockey', 'women']] },

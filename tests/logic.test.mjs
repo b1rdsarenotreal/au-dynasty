@@ -20,8 +20,8 @@ const backups = Object.fromEntries(files.map(f => [f.replace('.json.gz', ''), lo
 
 check('every dynasty backup is recognized as its sport', () => {
   const want = { 'volleyball-women': 'w-volleyball', 'volleyball-men': 'm-volleyball', 'softball-softball': 'softball', 'softball-baseball': 'baseball', 'soccer-women': 'w-soccer', 'soccer-men': 'm-soccer', 'fhockey-women': 'field-hockey',
-    'basketball-women': 'w-basketball', 'basketball-men': 'm-basketball', 'lacrosse-women': 'w-lacrosse', 'lacrosse-men': 'm-lacrosse', 'hockey-women': 'w-hockey', 'hockey-men': 'm-hockey' };
-  assert.equal(files.length, 13);
+    'basketball-women': 'w-basketball', 'basketball-men': 'm-basketball', 'lacrosse-women': 'w-lacrosse', 'lacrosse-men': 'm-lacrosse', 'hockey-women': 'w-hockey', 'hockey-men': 'm-hockey', football: 'football' };
+  assert.equal(files.length, 14);
   for (const [k, lg] of Object.entries(backups)) {
     assert.ok(isDynastyBackup(lg));
     const { sport, sure } = detectSport(lg);
@@ -88,14 +88,14 @@ check('each season\'s champions, records and finishes', () => {
 check('the all-sports cup', () => {
   assert.deepEqual(cupYears(H), [2030, 2031]);
   const c = cupStandings(H, 2031);
-  assert.equal(c.sports.length, 13);
+  assert.equal(c.sports.length, 14);
   assert.deepEqual(c.sports.map(x => x.id), Object.keys(SPORTS), 'in season order');
   const champs = Object.values(H.dynasties).map(d => d.years[2031].champion);
   for (const x of c.schools) assert.equal(x.total, Object.values(x.bySport).reduce((a, b) => a + b, 0));
   assert.ok(c.schools[0].total >= c.schools[1].total);
   assert.ok(champs.every(t => c.schools.find(x => x.school === t).total >= 100));
   const w = cupStandings(H, 2031, 'women'), m = cupStandings(H, 2031, 'men');
-  assert.equal(w.sports.length, 7); assert.equal(m.sports.length, 6);
+  assert.equal(w.sports.length, 7); assert.equal(m.sports.length, 7);
   assert.ok(w.sports.every(s => s.gender === 'women'));
   // Conference totals are their members' points.
   const conf = c.conferences.find(x => x.conf === 'Big Ten');

@@ -1,8 +1,8 @@
 # AAU Dynasty
 
-The front door to the owner's AAU dynasty apps (AAU Volleyball, AAU Softball
-& Baseball, AAU Soccer, AAU Field Hockey, AAU Basketball, AAU Lacrosse, AAU
-Hockey, and any later sport built on the same MCS engine): an all-sports
+The front door to the owner's AAU dynasty apps (AAU Football, AAU Volleyball,
+AAU Softball & Baseball, AAU Soccer, AAU Field Hockey, AAU Basketball, AAU
+Lacrosse, AAU Hockey, and any later sport built on the same MCS engine): an all-sports
 calendar and scoreboard, every sport's status with links into its app, and
 the record book (champions, school pages across sports, conferences,
 national tournaments, the All-Sports Cup). It replaced the older multi-sport
@@ -57,10 +57,11 @@ changes here aren't ported there, or theirs here, unless the owner asks.
 - A dynasty backup is the league JSON (`{ name, side, seasons: { year: {
   teams, games, post, polls, settings, overrides } }, conferences, coaches }`).
   `js/sports.js` detects the sport from `side` (softball/baseball), then
-  `league.sport` (basketball, lacrosse, hockey: the newer apps set it), then
-  the shape of regular-season line scores (volleyball sets, 2 soccer halves
-  or high-scoring basketball halves, 3 hockey periods, 4 field hockey
-  quarters, 7/9 innings), then the name; unknown sports are named on upload
+  `league.sport` (football, basketball, lacrosse, hockey: the newer apps set
+  it), then the shape of regular-season line scores (volleyball sets, 2
+  soccer halves or high-scoring basketball halves, 3 hockey periods, 4
+  football quarters of about 25 points a team, 4 field hockey quarters, 7/9
+  innings), then the name; unknown sports are named on upload
   (`customSport`). `SPORTS` is in season order (fall, winter, spring).
 - `js/extract.js` keeps only a summary per season (records, conference and
   coach, conference titles, national tournament finish and wins, final poll

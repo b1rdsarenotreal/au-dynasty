@@ -1,7 +1,7 @@
 // The sports AAU History knows, and how to tell which one a backup is.
 //
-// Every AAU dynasty app (volleyball, softball and baseball, soccer, field
-// hockey, basketball, lacrosse, ice hockey, and any later one built on the
+// Every AAU dynasty app (football, volleyball, softball and baseball, soccer,
+// field hockey, basketball, lacrosse, ice hockey, and any later one built on the
 // same engine) saves its backup as
 // the league itself: { name, side, seasons: { year: { teams, games, post,
 // polls, ... } }, conferences, coaches }. AAU History reads any of them.
@@ -28,6 +28,7 @@ const utc = (y, m, d) => new Date(Date.UTC(y, m, d));
 const lastWeekday = (y, m, last, dow) => last - ((utc(y, m, last).getUTCDay() - dow + 7) % 7); // the last <dow> on or before day `last`
 const firstMonday = (y, m) => 1 + ((8 - utc(y, m, 1).getUTCDay()) % 7);
 const START = {
+  laborSat: y => { const l = firstMonday(y, 8); return utc(y, 8, l - 7); }, // football: the week of the Saturday before Labor Day
   fallFri: y => utc(y, 7, lastWeekday(y, 7, 31, 5) - 4), // the week of the last Friday in August
   fallThu: y => utc(y, 7, lastWeekday(y, 7, 31, 4) - 3), // the week of the last Thursday in August (soccer)
   janFri2: y => { const f = 1 + ((5 - utc(y + 1, 0, 1).getUTCDay() + 7) % 7) + 7; return utc(y + 1, 0, f - 4); }, // second Friday of January
@@ -40,6 +41,7 @@ const START = {
 
 // In season order: fall, winter, spring.
 export const SPORTS = {
+  football: { name: 'Football', short: 'FB', gender: 'men', finals: 'AAU Championship', reg: 4, unit: 'game', start: START.laborSat },
   'w-volleyball': { name: "Women's Volleyball", short: 'W VB', gender: 'women', finals: 'Final Four', unit: 'match', start: START.fallFri },
   'm-volleyball': { name: "Men's Volleyball", short: 'M VB', gender: 'men', finals: 'National Tournament', unit: 'match', start: START.janFri2 },
   'w-soccer': { name: "Women's Soccer", short: 'W Soc', gender: 'women', finals: 'College Cup', ties: true, reg: 2, unit: 'match', start: START.fallThu },
@@ -67,8 +69,9 @@ export function customSport(name, gender) {
 // sport but volleyball, whose R is sets won) and the average score per team.
 // Volleyball has 3–5 sets of up to 25+ points; softball 7 innings, baseball
 // 9; soccer 2 halves; ice hockey 3 periods; basketball 2 halves or 4
-// quarters of many points; field hockey and lacrosse 4 quarters (lacrosse
-// about 11 goals a team, field hockey about 2–3).
+// quarters of many points; football, field hockey and lacrosse 4 quarters
+// (football about 25 points a team, lacrosse about 11 goals, field hockey
+// about 2–3).
 function lineShape(league) {
   const lens = [], tops = [];
   let summed = 0, points = 0;
@@ -95,7 +98,7 @@ function lineShape(league) {
 export function sportWord(text) {
   const t = String(text || '').toLowerCase().replace(/[^a-z]+/g, ' ');
   const found = [
-    ['volleyball', /volleyball/], ['basketball', /basketball/], ['lacrosse', /lacrosse/],
+    ['football', /football/], ['volleyball', /volleyball/], ['basketball', /basketball/], ['lacrosse', /lacrosse/],
     ['field-hockey', /field hockey|fhockey/], ['hockey', /(^|[^d] )hockey|^hockey/], ['soccer', /soccer/],
     ['softball', /softball/], ['baseball', /baseball/],
   ].filter(([, re]) => re.test(t)).map(([w]) => w);
@@ -112,6 +115,7 @@ export function detectSport(league) {
   if (side === 'softball') return { sport: SPORTS.softball, sure: true };
   if (side === 'baseball') return { sport: SPORTS.baseball, sure: true };
   // Newer apps say which sport they are.
+  if (league?.sport === 'football') return { sport: SPORTS.football, sure: true };
   const tagged = { basketball: 'basketball', lacrosse: 'lacrosse', hockey: 'hockey' }[league?.sport];
   if (tagged) return { sport: SPORTS[`${men ? 'm' : 'w'}-${tagged}`], sure: true };
   const shape = lineShape(league);
@@ -123,10 +127,12 @@ export function detectSport(league) {
     if (shape.len === 9) return { sport: SPORTS.baseball, sure: true };
     if (shape.len === 3 && shape.top < 10) return { sport: pick('hockey'), sure: true };
     if (shape.len === 2 && shape.top < 10) return { sport: pick('soccer'), sure: true };
+    if (shape.sums && shape.len === 4 && shape.avg >= 18) return { sport: SPORTS.football, sure: true };
     if (shape.len === 4 && shape.avg >= 7) return { sport: pick('lacrosse'), sure: true };
     if (shape.len === 4 && shape.top < 10) return { sport: SPORTS['field-hockey'], sure: true };
   }
   // No results yet (or a new sport): go by the name.
+  if (/football/.test(name)) return { sport: SPORTS.football, sure: true };
   if (/volleyball/.test(name)) return { sport: SPORTS[men ? 'm-volleyball' : 'w-volleyball'], sure: true };
   if (/soccer/.test(name)) return { sport: SPORTS[men ? 'm-soccer' : 'w-soccer'], sure: true };
   if (/field hockey|fhockey/.test(name)) return { sport: SPORTS['field-hockey'], sure: true };
