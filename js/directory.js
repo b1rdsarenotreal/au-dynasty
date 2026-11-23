@@ -113,6 +113,8 @@ export const DIRECTORY_CONFERENCES = {
   "UC Athletic Association": {"abbr":"UCAA","color":"#0F6E7A","altColor":"#F2C14E","logo":"img/conf/ucaa.svg"},
   "Greater South Conference": {"abbr":"GSC","color":"#14284B","altColor":"#A3262C","logo":"img/conf/gsc.svg"},
   "Horizon Valley Conference": {"abbr":"HVC","color":"#33265A","altColor":"#E5672A","logo":"img/conf/hvc.svg"},
+  "Rocky West Conference": {"abbr":"RWC","color":"#1F4D3A","altColor":"#E3A72F","logo":"img/conf/rwc.svg"},
+  "Colonial 10": {"abbr":"C10","color":"#14274E","altColor":"#B22234","logo":"img/conf/c10.svg"},
   "Western Athletic Conference": {"abbr":"WAC","color":"#0B2D6B","altColor":"#B9975B","logo":"https://content.sportslogos.net/logos/153/4669/full/western_athletic_conference_logo_primary_19922010.png"},
   "University Athletic Association": {"abbr":"UAA","color":"#003087","altColor":"#F2B33D","logo":"https://dbukjj6eu5tsf.cloudfront.net/uaasports.info/images/responsive_2023/logo-main.svg"},
 };
