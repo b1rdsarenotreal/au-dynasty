@@ -1,18 +1,18 @@
 // App shell: loading the record book and the apps' saves, the top bar and
 // page routing.
 
-import { loadHistory, repairHistory, saveHistory, mergeDynasty } from './store.js?v=20261122194614';
-import { loadLive } from './live.js?v=20261122194614';
-import { extractDynasty } from './extract.js?v=20261122194614';
-import { renderCalendar } from './calendar.js?v=20261122194614';
-import { renderSports } from './sports-page.js?v=20261122194614';
-import { renderRealign } from './realign.js?v=20261122194614';
-import { loadLogoTable } from './logos.js?v=20261122194614';
-import { renderSchool } from './school.js?v=20261122194614';
-import { renderTournament } from './tournament.js?v=20261122194614';
-import { renderConference, renderConferences } from './conference.js?v=20261122194614';
-import { ctx, app, esc } from './ui.js?v=20261122194614';
-import { renderHome, renderChampions, renderSchools, renderCup, renderData } from './views.js?v=20261122194614';
+import { loadHistory, repairHistory, saveHistory, mergeDynasty } from './store.js?v=20261122201752';
+import { loadLive } from './live.js?v=20261122201752';
+import { extractDynasty } from './extract.js?v=20261122201752';
+import { renderCalendar } from './calendar.js?v=20261122201752';
+import { renderSports } from './sports-page.js?v=20261122201752';
+import { renderRealign } from './realign.js?v=20261122201752';
+import { loadLogoTable } from './logos.js?v=20261122201752';
+import { renderSchool } from './school.js?v=20261122201752';
+import { renderTournament } from './tournament.js?v=20261122201752';
+import { renderConference, renderConferences } from './conference.js?v=20261122201752';
+import { ctx, app, esc } from './ui.js?v=20261122201752';
+import { renderHome, renderChampions, renderSchools, renderCup, renderData } from './views.js?v=20261122201752';
 
 const VIEWS = { home: 'Home', calendar: 'Calendar', sports: 'Sports', champions: 'Champions', tournament: 'Tournaments', schools: 'Schools', conferences: 'Conferences', realign: 'Realignment', cup: 'All-Sports Cup', data: 'Data' };
 const SUBVIEWS = { school: 'schools', conference: 'conferences' };

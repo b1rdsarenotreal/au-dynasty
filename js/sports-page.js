@@ -1,11 +1,11 @@
 // The Sports page: every sport's app, where its season stands (read from
 // this browser's saves) and links into it.
 
-import { ctx, app, $$, esc, logoImg, seasonLabel } from './ui.js?v=20261122194614';
-import { APPS, appHref, openApp } from './live.js?v=20261122194614';
-import { SPORTS } from './sports.js?v=20261122194614';
-import { calendarDays, calendarUrl, longDate } from './calendar.js?v=20261122194614';
-import { schoolUrl } from './school.js?v=20261122194614';
+import { ctx, app, $$, esc, logoImg, seasonLabel } from './ui.js?v=20261122201752';
+import { APPS, appHref, openApp } from './live.js?v=20261122201752';
+import { SPORTS } from './sports.js?v=20261122201752';
+import { calendarDays, calendarUrl, longDate } from './calendar.js?v=20261122201752';
+import { schoolUrl } from './school.js?v=20261122201752';
 
 const PHASE = { regular: 'Regular season', conf: 'Conference tournaments', selection: 'Selection', regionals: 'National tournament', supers: 'National tournament', mcws: 'National finals', complete: 'Season complete' };
 const isFinal = g => !!g.final && g.homeR != null && g.awayR != null;
