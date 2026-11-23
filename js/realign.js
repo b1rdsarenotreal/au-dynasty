@@ -6,10 +6,10 @@
 // applies it (or skips it for that sport). The apps mark a plan applied or
 // skipped in their own save (`league.realign[planId]`), which this page reads.
 
-import { ctx, app, modal, $, $$, esc, toast, readableOn, schoolLook, assetUrl } from './ui.js?v=20261122201752';
-import { logoFor } from './logos.js?v=20261122201752';
-import { DIRECTORY_SCHOOLS, DIRECTORY_CONFERENCES } from './directory.js?v=20261122201752';
-import { openApp, appHref } from './live.js?v=20261122201752';
+import { ctx, app, modal, $, $$, esc, toast, readableOn, schoolLook, assetUrl } from './ui.js?v=20261122204729';
+import { logoFor } from './logos.js?v=20261122204729';
+import { DIRECTORY_SCHOOLS, DIRECTORY_CONFERENCES } from './directory.js?v=20261122204729';
+import { openApp, appHref } from './live.js?v=20261122204729';
 
 export const REALIGN_KEY = 'aau-realignment';
 const OUT = '__out__'; // the "Not in the AAU" tray
